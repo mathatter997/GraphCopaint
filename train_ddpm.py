@@ -54,7 +54,7 @@ accelerator = Accelerator(
     project_dir=os.path.join(config.output_dir, "logs"),
 )
 
-dataloader = DataLoader(lobster_list) # load lobsters
+dataloader = DataLoader(lobster_list, batch_size=config.train_batch_size, shuffle=True) # load lobsters
 model = LobsterDynamics(in_node_nf=config.in_node_nf, 
                         in_edge_nf=config.in_edge_nf, 
                         hidden_nf=config.hidden_nf, 

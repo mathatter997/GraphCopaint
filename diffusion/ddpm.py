@@ -49,8 +49,13 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
 
             # Add noise to the clean images according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
-            noisy_nodes = noise_scheduler.add_noise(batch.x, node_noise, timesteps)
-            noisy_edges = noise_scheduler.add_noise(batch.edge_attr, edge_noise, timesteps)
+            noisy_nodes = noise_scheduler.add_noise(batch.x.reshape(bs, num_nodes, -1), 
+                                                    node_noise.reshape(bs, num_nodes, -1), 
+                                                    timesteps).reshape(batch.x.size(0), -1)
+            noisy_edges = noise_scheduler.add_noise(batch.edge_attr.reshape(bs, num_edges, -1), 
+                                                    edge_noise.reshape(bs, num_edges, -1), 
+                                                    timesteps).reshape(batch.edge_index.size(1), -1)
+            
             noisy_nodes = noisy_nodes * node_mask
             noisy_edges = noisy_edges * edge_mask
 
@@ -81,6 +86,7 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
 
             # After each epoch you optionally sample some demo images with evaluate() and save the model
             if accelerator.is_main_process:
-                pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
+                # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
                 if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
-                    pipeline.save_pretrained(config.output_dir)
+                    noise_scheduler.save_pretrained(config.output_dir)
+                    torch.save(accelerator.unwrap_model(model).state_dict(), config.output_dir)
