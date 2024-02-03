@@ -1,3 +1,5 @@
-networkx
 torch
+networkx
+diffusers
+accelerate
 torch_geometric

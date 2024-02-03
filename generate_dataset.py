@@ -1,7 +1,7 @@
-from utils import lobster_list, prepare_json_dataset
+from data.utils import lobster_list, prepare_json_dataset
 
-numsamples = 30000
-backbonelength = 8
+numsamples = 10000
+backbonelength = 7
 p1 = 0.5 # prob. of adding node to a node in backbone
 p2 = 0.5 # prob. of adding node to node above
 p = 0.5  # prob. of red or blue
@@ -12,7 +12,7 @@ lobsterlist= lobster_list(numsamples=numsamples,
                             p2=p2,
                             p=p)
 
-path = 'dataset'
+path = 'data/dataset'
 filename = 'lobsters.json'
 filepath = '/'.join([path, filename])
 prepare_json_dataset(lobsterlist=lobsterlist, 
