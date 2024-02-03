@@ -89,4 +89,4 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
                 if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
                     noise_scheduler.save_pretrained(config.output_dir)
-                    torch.save(accelerator.unwrap_model(model).state_dict(), config.output_dir)
+                    torch.save(accelerator.unwrap_model(model), config.output_dir + config.output_dir_gnn.format(epoch + 1))

@@ -25,7 +25,8 @@ class TrainingConfig:
     save_image_epochs = 5
     save_model_epochs = 10
     mixed_precision = "no"  # `no` for float32, `fp16` for automatic mixed precision
-    output_dir = "diffusion/models"  # the model name locally and on the HF Hub
+    output_dir = "diffusion/models/"  # the model name locally and on the HF Hub
+    output_dir_gnn = 'gnn/checkpoint_epoch_{}.pth'
 
     push_to_hub = False  # whether to upload the saved model to the HF Hub
     hub_private_repo = False
