@@ -1,3 +1,5 @@
 data/dataset/*
 test.ipynb
 .env
+diffusion/models
+diffusion/models/scheduler_config.json

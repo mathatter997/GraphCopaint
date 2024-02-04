@@ -2,7 +2,6 @@ import os
 import torch
 import torch.nn.functional as F
 
-from pathlib import Path
 from dataclasses import dataclass
 from accelerate import Accelerator
 from diffusers import DDPMScheduler
@@ -66,7 +65,9 @@ model = LobsterDynamics(in_node_nf=config.in_node_nf,
                         normalization_factor=config.normalization_factor, 
                         aggregation_method=config.aggregation_method)
 
-noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
+noise_scheduler = DDPMScheduler(num_train_timesteps=1000, 
+                                beta_schedule='squaredcos_cap_v2')
+
 optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
 lr_scheduler = get_cosine_schedule_with_warmup(
     optimizer=optimizer,

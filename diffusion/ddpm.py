@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 
 from tqdm.auto import tqdm
-from diffusers import DDPMPipeline
 
 def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler, accelerator):
     # Initialize accelerator and tensorboard logging
@@ -39,7 +38,7 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
             for i in range(bs):
                 n = batch[i].card.item()
                 node_mask[i * num_nodes: i * num_nodes + n] = 1
-                edge_mask[i * num_edges: i * n * (n - 1)] = 1 # directed graph
+                edge_mask[i * num_edges: i * num_edges + n * (n - 1)] = 1 # directed graph
 
             # Sample a random timestep for each image
             timesteps = torch.randint(
@@ -72,6 +71,11 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 loss = F.mse_loss(noise_node_pred, noisy_nodes) + \
                         F.mse_loss(noise_edge_pred, noisy_edges)
                 
+                if type(loss) is torch.nan:
+                    print('node:', noise_node_pred)
+                    print('edge:', noise_node_pred)
+                    break
+
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()

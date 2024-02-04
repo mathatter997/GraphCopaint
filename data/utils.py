@@ -69,15 +69,17 @@ def encode(lobster, max_nodes):
     edge_attr = []
     for i in range(lobster.card):
         for j in range(lobster.card):
-            edge_index.append([i, j])
-            attr = 1 if j in lobster.adj[i] else 0
-            edge_attr.append(attr)
+            if i != j: # no loops
+                edge_index.append([i, j])
+                attr = 1 if j in lobster.adj[i] else 0
+                edge_attr.append(attr)
     for i in range(max_nodes):
         for j in range(max_nodes):
-            if i < lobster.card and j < lobster.card:
+            if i != j and i < lobster.card and j < lobster.card:
                 continue
             edge_index.append([i, j])
             edge_attr.append(0)
+    
     
     edge_index = torch.tensor(edge_index).t().contiguous()
     edge_attr = torch.tensor(edge_attr).reshape(-1, 1)
