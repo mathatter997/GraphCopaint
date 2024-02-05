@@ -66,7 +66,8 @@ model = LobsterDynamics(in_node_nf=config.in_node_nf,
                         aggregation_method=config.aggregation_method)
 
 noise_scheduler = DDPMScheduler(num_train_timesteps=1000, 
-                                beta_schedule='squaredcos_cap_v2')
+                                beta_schedule='squaredcos_cap_v2'
+                                )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
 lr_scheduler = get_cosine_schedule_with_warmup(

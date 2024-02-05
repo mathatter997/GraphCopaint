@@ -58,20 +58,20 @@ def prepare_json_dataset(lobsterlist, filepath):
     f.close()         
 
 # turn Lobster into Data 
-def encode(lobster, max_nodes):
-    x = torch.empty(max_nodes, 4)
+def encode(lobster, max_nodes, max_nbrs, max_md1, max_md2, num_node_feat=4, color_norm_factor=2, edge_attr_norm_factor=2):
+    x = torch.empty(max_nodes, num_node_feat)
     for i in range(lobster.card):
-            x[i][0] = lobster.colors[i]
-            x[i][1] = len(lobster.adj[i]) # degree
-            x[i][2] = lobster.md1[i] # distance of furthest node
-            x[i][3] = lobster.md2[i] # distance of 2nd furthest node
+            x[i][0] = lobster.colors[i] / color_norm_factor
+            x[i][1] = len(lobster.adj[i]) / (max_nbrs + 1)
+            x[i][2] = lobster.md1[i] / (max_md1 + 1)
+            x[i][3] = lobster.md2[i] / (max_md2 + 1)
     edge_index = []
     edge_attr = []
     for i in range(lobster.card):
         for j in range(lobster.card):
             if i != j: # no loops
                 edge_index.append([i, j])
-                attr = 1 if j in lobster.adj[i] else 0
+                attr = 1 / edge_attr_norm_factor if j in lobster.adj[i] else 0
                 edge_attr.append(attr)
     for i in range(max_nodes):
         for j in range(max_nodes):

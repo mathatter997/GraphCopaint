@@ -10,8 +10,8 @@ from diffusion.ddim_sample import sample
 class InferenceConfig:
     max_n_nodes = None
     data_filepath = 'data/dataset/lobsters.json'
-    scheduler_filepath = "diffusion/models/scheduler/scheduler_config.json"  # the model name locally and on the HF Hub
-    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_50.pth'
+    scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
+    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_10.pth'
     eta = 1 # DDPM
 
     device = 'mps'
@@ -48,14 +48,18 @@ model = LobsterDynamics(in_node_nf=config.in_node_nf,
 model = torch.load(config.checkpoint_filepath)
 model.eval()
 
-n = 10
+n = 30
 s = 1000 # num inference steps
 
-sample(config=config, 
-       model=model, 
-       noise_scheduler=noise_scheduler, 
-       num_inference_steps=s,
-       n=n)
+print(noise_scheduler)
+nodes, edges = sample(config=config, 
+                        model=model, 
+                        noise_scheduler=noise_scheduler, 
+                        num_inference_steps=s,
+                        n=n)
+
+print(nodes[:n+1])
+print(edges[:n * n])
 
 
 

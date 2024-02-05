@@ -45,6 +45,11 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 0, noise_scheduler.config.num_train_timesteps, (bs,), device=accelerator.device, 
                 dtype=torch.int64
             )
+            
+            timesteps = torch.randint(
+                0, 1, (bs,), device=accelerator.device, 
+                dtype=torch.int64
+            )
 
             # Add noise to the clean images according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
@@ -55,9 +60,10 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                                                     edge_noise.reshape(bs, num_edges, -1), 
                                                     timesteps).reshape(batch.edge_index.size(1), -1)
             
+            node_noise = node_noise * node_mask
+            edge_noise = edge_noise * edge_mask
             noisy_nodes = noisy_nodes * node_mask
             noisy_edges = noisy_edges * edge_mask
-
             with accelerator.accumulate(model):
                 # Predict the noise residual
                 noise_node_pred, noise_edge_pred = model(x=noisy_nodes, 
@@ -68,8 +74,8 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                                                         node_mask=node_mask,
                                                         edge_mask=edge_mask
                                                         )
-                loss = F.mse_loss(noise_node_pred, noisy_nodes) + \
-                        F.mse_loss(noise_edge_pred, noisy_edges)
+                loss = F.mse_loss(noise_node_pred, node_noise) + \
+                        F.mse_loss(noise_edge_pred, edge_noise)
                 
                 if type(loss) is torch.nan:
                     print('node:', noise_node_pred)
