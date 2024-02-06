@@ -25,7 +25,7 @@ def load_data(filepath):
     print(max_nodes, max_nbrs, max_md1, max_md2)
     for k, lobster in enumerate(lobster_list):
         lobster_list[k] = encode(lobster, max_nodes, max_nbrs, max_md1, max_md2)
-
+        
     return lobster_list, max_nodes                 
 
 

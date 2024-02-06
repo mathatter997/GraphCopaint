@@ -5,7 +5,7 @@
   "beta_schedule": "squaredcos_cap_v2",
   "beta_start": 0.0001,
   "clip_sample": true,
-  "clip_sample_range": 66,
+  "clip_sample_range": 1.0,
   "dynamic_thresholding_ratio": 0.995,
   "num_train_timesteps": 1000,
   "prediction_type": "epsilon",

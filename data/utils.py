@@ -59,12 +59,16 @@ def prepare_json_dataset(lobsterlist, filepath):
 
 # turn Lobster into Data 
 def encode(lobster, max_nodes, max_nbrs, max_md1, max_md2, num_node_feat=4, color_norm_factor=2, edge_attr_norm_factor=2):
-    x = torch.empty(max_nodes, num_node_feat)
+    x = torch.zeros(max_nodes, num_node_feat)
     for i in range(lobster.card):
             x[i][0] = lobster.colors[i] / color_norm_factor
             x[i][1] = len(lobster.adj[i]) / (max_nbrs + 1)
             x[i][2] = lobster.md1[i] / (max_md1 + 1)
             x[i][3] = lobster.md2[i] / (max_md2 + 1)
+            # x[i][0] = lobster.colors[i] 
+            # x[i][1] = len(lobster.adj[i]) 
+            # x[i][2] = lobster.md1[i] 
+            # x[i][3] = lobster.md2[i]
     edge_index = []
     edge_attr = []
     for i in range(lobster.card):

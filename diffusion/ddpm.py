@@ -45,11 +45,6 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 0, noise_scheduler.config.num_train_timesteps, (bs,), device=accelerator.device, 
                 dtype=torch.int64
             )
-            
-            timesteps = torch.randint(
-                0, 1, (bs,), device=accelerator.device, 
-                dtype=torch.int64
-            )
 
             # Add noise to the clean images according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
@@ -59,7 +54,7 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
             noisy_edges = noise_scheduler.add_noise(batch.edge_attr.reshape(bs, num_edges, -1), 
                                                     edge_noise.reshape(bs, num_edges, -1), 
                                                     timesteps).reshape(batch.edge_index.size(1), -1)
-            
+
             node_noise = node_noise * node_mask
             edge_noise = edge_noise * edge_mask
             noisy_nodes = noisy_nodes * node_mask
