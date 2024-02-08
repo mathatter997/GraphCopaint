@@ -38,11 +38,6 @@ def sample(config, model, noise_scheduler, num_inference_steps=1000, n=1):
     for t in noise_scheduler.timesteps:
         input_x = input_x * node_mask
         input_e = input_e * edge_mask
-        
-        print(torch.norm(input_x))
-        if torch.isnan(input_x).any():
-            print(t)
-            break
 
         with torch.no_grad():
             node_noise_res, node_edge_res = model(x=input_x, 

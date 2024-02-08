@@ -1,8 +1,9 @@
-import os
-import torch 
+import torch
+import networkx as nx 
+from data.utils import decode
 from dataclasses import dataclass
 from diffusers import DDIMScheduler
-from data.data_loader import load_data
+from data.data_loader import get_lobsters_from_json, get_max_params
 from diffusion.lobster_dynamics import LobsterDynamics
 from diffusion.ddim_sample import sample
 
@@ -11,8 +12,8 @@ class InferenceConfig:
     max_n_nodes = None
     data_filepath = 'data/dataset/lobsters.json'
     scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
-    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_50.pth'
-    eta = 1 # DDPM
+    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_50_r2.pth'
+    eta = 0 # DDPM
 
     device = 'mps'
 
@@ -27,7 +28,8 @@ class InferenceConfig:
     aggregation_method='sum'
 
 config = InferenceConfig()
-_, max_n_nodes = load_data(config.data_filepath)
+lobster_list = get_lobsters_from_json(config.data_filepath)
+max_n_nodes, _, _, _ = get_max_params(lobster_list)
 config.max_n_nodes = max_n_nodes
 
 # https://huggingface.co/papers/2305.08891 
@@ -48,11 +50,7 @@ model = LobsterDynamics(in_node_nf=config.in_node_nf,
 model = torch.load(config.checkpoint_filepath)
 model.eval()
 
-for param in model.parameters():
-    if torch.isnan(param).any():
-        print('WHAHATA')
-
-n = 30
+n = 20
 s = 1000 # num inference steps
 
 nodes, edges = sample(config=config, 
@@ -61,8 +59,22 @@ nodes, edges = sample(config=config,
                         num_inference_steps=s,
                         n=n)
 
-print(nodes[:n+1])
-print(edges[:n * n])
+nodes = nodes[:n]
+edges = edges[:n * (n-1)]
+
+import matplotlib.pyplot as plt
+
+fig = plt.figure(figsize=(12,12))
+ax = plt.subplot(111)
+ax.set_title('Graph - Shapes', fontsize=10)
+
+G = decode(node_features=nodes, edge_features=edges)
+pos = nx.spring_layout(G)
+nx.draw(G, pos)
+
+plt.tight_layout()
+plt.show()
+
 
 
 

@@ -18,15 +18,6 @@ class EdgeMLP(Module):
         x_2 = torch.abs(x_i - x_j)
         v = torch.column_stack([x_1, x_2, e_ij, t])
         esp_e = self.edge_mlp(v)
-        if torch.isnan(esp_e).any():
-                print(torch.isnan(x_i).any())
-                print(torch.isnan(x_j).any())
-                print(torch.isnan(x_1).any())
-                print(torch.isnan(x_2).any())
-                print(torch.isnan(e_ij).any())
-                print(torch.seed())
-                print('edge nan', t)
-                quit()
         return esp_e + e_ij
 
 class EdgeEncoder(Module):
@@ -162,6 +153,7 @@ class GNN(nn.Module):
         self.to(self.device)
 
     def forward(self,  x, t, edge_index, edge_attr, batch_size, node_mask=None, edge_mask=None):
+        x = self.node_embedding(x)
         edge_attr = self.edge_embedding(edge_attr)
         for i in range(0, self.n_layers):
             x, edge_attr = self._modules["gcl_%d" % i](x=x, 

@@ -24,6 +24,7 @@ class TrainingConfig:
     save_image_epochs = 5
     save_model_epochs = 10
     mixed_precision = "no"  # `no` for float32, `fp16` for automatic mixed precision
+    load_model_dir = 'gnn/checkpoint_epoch_50.pth'
     output_dir = "diffusion/models/"  # the model name locally and on the HF Hub
     output_dir_gnn = 'gnn/checkpoint_epoch_{}.pth'
 
@@ -65,6 +66,10 @@ model = LobsterDynamics(in_node_nf=config.in_node_nf,
                         normalization_factor=config.normalization_factor, 
                         aggregation_method=config.aggregation_method)
 
+if config.load_model_dir:
+    model = torch.load(config.output_dir + config.load_model_dir)
+    config.learning_rate = 1e-6
+
 noise_scheduler = DDPMScheduler(num_train_timesteps=1000, 
                                 beta_schedule='squaredcos_cap_v2',
                                 )
@@ -83,5 +88,6 @@ train_loop(config=config,
            optimizer=optimizer,
            train_dataloader=dataloader,
            lr_scheduler=lr_scheduler,
-           accelerator=accelerator)
+           accelerator=accelerator,
+           label='_r2')
 

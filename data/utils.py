@@ -19,6 +19,7 @@ def lobster_list(numsamples, backbonelength, p1, p2, p):
         lobsterlist.append(L)
     return lobsterlist
 
+
 def bfs(lobster, node):
     seen = {node}
     frontier = [(node, 0)]
@@ -33,6 +34,7 @@ def bfs(lobster, node):
     _, dist_max = frontier[-1]
     _, dist_snd_max = frontier[-2]
     return dist_max, dist_snd_max
+
 
 def prepare_json_dataset(lobsterlist, filepath):
     with open(filepath, 'w') as f:
@@ -57,7 +59,7 @@ def prepare_json_dataset(lobsterlist, filepath):
         f.write(']')
     f.close()         
 
-# turn Lobster into Data 
+
 def encode(lobster, max_nodes, max_nbrs, max_md1, max_md2, num_node_feat=4, color_norm_factor=2, edge_attr_norm_factor=2):
     x = torch.zeros(max_nodes, num_node_feat)
     for i in range(lobster.card):
@@ -65,10 +67,6 @@ def encode(lobster, max_nodes, max_nbrs, max_md1, max_md2, num_node_feat=4, colo
             x[i][1] = len(lobster.adj[i]) / (max_nbrs + 1)
             x[i][2] = lobster.md1[i] / (max_md1 + 1)
             x[i][3] = lobster.md2[i] / (max_md2 + 1)
-            # x[i][0] = lobster.colors[i] 
-            # x[i][1] = len(lobster.adj[i]) 
-            # x[i][2] = lobster.md1[i] 
-            # x[i][3] = lobster.md2[i]
     edge_index = []
     edge_attr = []
     for i in range(lobster.card):
@@ -89,7 +87,36 @@ def encode(lobster, max_nodes, max_nbrs, max_md1, max_md2, num_node_feat=4, colo
     edge_attr = torch.tensor(edge_attr).reshape(-1, 1)
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, card=lobster.card)
 
-# convert graph or json dict into Lobster
+
+def decode(node_features, edge_features, threshhold=None):
+    G = nx.Graph()
+    n = node_features.size(0)
+    nodes = [node for node in range(n)]
+    G.add_nodes_from(nodes)
+
+    edges = []
+    if threshhold is None:
+        indices = {i.item() for i in torch.topk(edge_features.flatten(), 2 * (n - 1)).indices}
+    else:
+         indices = {idx for idx, val in enumerate(edge_features.flatten()) if val >= threshhold}
+    idx = 0
+    for i in range(n):
+        for j in range(n):
+            if i == j: 
+                continue
+            if j >= i:
+                idx = idx + 1
+                continue 
+            if idx in indices:
+                edges.append((i, j))
+                if threshhold is None and len(edges) == n - 1:
+                    break
+            idx = idx + 1
+    print(edges)
+    G.add_edges_from(edges)
+    return G
+
+
 class Lobster:
     def __init__(self, G : Union[nx.Graph, dict]):
         if type(G) is nx.Graph:

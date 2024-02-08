@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from tqdm.auto import tqdm
 
-def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler, accelerator):
+def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler, accelerator, label=''):
     # Initialize accelerator and tensorboard logging
     if accelerator.is_main_process:
         if config.output_dir is not None:
@@ -71,11 +71,6 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                                                         )
                 loss = F.mse_loss(noise_node_pred, node_noise) + \
                         F.mse_loss(noise_edge_pred, edge_noise)
-                
-                if type(loss) is torch.nan:
-                    print('node:', noise_node_pred)
-                    print('edge:', noise_node_pred)
-                    break
 
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
@@ -94,4 +89,5 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
                 if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
                     noise_scheduler.save_pretrained(config.output_dir)
-                    torch.save(accelerator.unwrap_model(model), config.output_dir + config.output_dir_gnn.format(epoch + 1))
+                    torch.save(accelerator.unwrap_model(model), config.output_dir + 
+                                                                config.output_dir_gnn.format(str(epoch + 1) + label))
