@@ -1,15 +1,40 @@
 import os
 import torch
+import wandb
 import torch.nn.functional as F
 
+from .utils import dense_adj
 from tqdm.auto import tqdm
 
-def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler, accelerator, label=''):
+
+def train_loop(
+    config,
+    model,
+    noise_scheduler,
+    optimizer,
+    train_dataloader,
+    lr_scheduler,
+    accelerator,
+    label="",
+):
     # Initialize accelerator and tensorboard logging
     if accelerator.is_main_process:
         if config.output_dir is not None:
             os.makedirs(config.output_dir, exist_ok=True)
         accelerator.init_trackers("train_example")
+
+    # start a new wandb run to track this script
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="Simple Graph Diffusion",
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": config.learning_rate,
+            "architecture": "PGSN",
+            "dataset": config.data_name,
+            "epochs": config.num_epochs,
+        },
+    )
 
     # Prepare everything
     # There is no specific order to remember, you just need to unpack the
@@ -18,59 +43,40 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
         model, optimizer, train_dataloader, lr_scheduler
     )
 
+    max_n_nodes = config.max_n_nodes
     global_step = 0
 
-    for epoch in range(config.num_epochs):
-        progress_bar = tqdm(total=len(train_dataloader), disable=not accelerator.is_local_main_process)
+    # [0,1] -> [-1, 1]
+    scale_data = lambda x: 2.0 * x - 1
+
+    for epoch in range(config.start_epoch, config.num_epochs):
+        progress_bar = tqdm(
+            total=len(train_dataloader), disable=not accelerator.is_local_main_process
+        )
         progress_bar.set_description(f"Epoch {epoch}")
 
         for step, batch in enumerate(train_dataloader):
-            # Sample noise to add to the images
-            node_noise = torch.randn(batch.x.shape, device=accelerator.device)
-            edge_noise = torch.randn(batch.edge_attr.shape, device=accelerator.device)
-            bs = len(batch)
-            
-            num_nodes = batch[0].x.size(0)
-            num_edges = batch[0].edge_index.size(1)
+            adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
+            edge_noise = torch.randn(adj.shape, device=accelerator.device)
 
-            node_mask = torch.zeros_like(batch.x[:,0:1], device=accelerator.device)
-            edge_mask = torch.zeros_like(batch.edge_attr[:,0:1], device=accelerator.device)
-            for i in range(bs):
-                n = batch[i].card.item()
-                node_mask[i * num_nodes: i * num_nodes + n] = 1
-                edge_mask[i * num_edges: i * num_edges + n * (n - 1)] = 1 # directed graph
-
-            # Sample a random timestep for each image
             timesteps = torch.randint(
-                0, noise_scheduler.config.num_train_timesteps, (bs,), device=accelerator.device, 
-                dtype=torch.int64
+                0,
+                noise_scheduler.config.num_train_timesteps,
+                (adj.shape[0],),
+                device=accelerator.device,
+                dtype=torch.int64,
             )
 
             # Add noise to the clean images according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
-            noisy_nodes = noise_scheduler.add_noise(batch.x.reshape(bs, num_nodes, -1), 
-                                                    node_noise.reshape(bs, num_nodes, -1), 
-                                                    timesteps).reshape(batch.x.size(0), -1)
-            noisy_edges = noise_scheduler.add_noise(batch.edge_attr.reshape(bs, num_edges, -1), 
-                                                    edge_noise.reshape(bs, num_edges, -1), 
-                                                    timesteps).reshape(batch.edge_index.size(1), -1)
+            noisy_edges = noise_scheduler.add_noise(adj, edge_noise, timesteps)
+            edge_noise = edge_noise * adj_mask
+            noisy_edges = noisy_edges * adj_mask
 
-            node_noise = node_noise * node_mask
-            edge_noise = edge_noise * edge_mask
-            noisy_nodes = noisy_nodes * node_mask
-            noisy_edges = noisy_edges * edge_mask
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                noise_node_pred, noise_edge_pred = model(x=noisy_nodes, 
-                                                        edge_attr=noisy_edges,
-                                                        t=timesteps,
-                                                        edge_index=batch.edge_index,
-                                                        batch_size=bs,
-                                                        node_mask=node_mask,
-                                                        edge_mask=edge_mask
-                                                        )
-                loss = F.mse_loss(noise_node_pred, node_noise) + \
-                        F.mse_loss(noise_edge_pred, edge_noise)
+                noise_edge_pred = model(noisy_edges, timesteps, mask=adj_mask)
+                loss = F.mse_loss(noise_edge_pred, edge_noise)
 
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
@@ -79,7 +85,12 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
                 optimizer.zero_grad()
 
             progress_bar.update(1)
-            logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0], "step": global_step}
+            logs = {
+                "loss": loss.detach().item(),
+                "lr": lr_scheduler.get_last_lr()[0],
+                "step": global_step,
+            }
+            wandb.log(logs)
             progress_bar.set_postfix(**logs)
             accelerator.log(logs, step=global_step)
             global_step += 1
@@ -87,7 +98,23 @@ def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_s
             # After each epoch you optionally sample some demo images with evaluate() and save the model
             if accelerator.is_main_process:
                 # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
-                if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
+                if (
+                    epoch + 1
+                ) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
                     noise_scheduler.save_pretrained(config.output_dir)
-                    torch.save(accelerator.unwrap_model(model), config.output_dir + 
-                                                                config.output_dir_gnn.format(str(epoch + 1) + label))
+                    file_path = config.output_dir + config.output_dir_gnn.format(
+                        str(epoch + 1 + config.start) + label
+                    )
+                    directory = os.path.dirname(file_path)
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                    torch.save(
+                        {
+                            "epoch": epoch,
+                            "model_state_dict": accelerator.unwrap_model(
+                                model
+                            ).state_dict(),
+                            "optimizer_state_dict": optimizer.state_dict(),
+                        },
+                        file_path,
+                    )

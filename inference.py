@@ -1,21 +1,24 @@
 import torch
 import networkx as nx 
-from data.utils import decode
+from diffusion.pgsn import PGSN
 from dataclasses import dataclass
 from diffusers import DDIMScheduler
-from data.data_loader import get_lobsters_from_json, get_max_params
-from diffusion.lobster_dynamics import LobsterDynamics
+from data.dataset import get_dataset
+from data.data_loader import load_data
 from diffusion.ddim_sample import sample
+from data.utils import Lobster, prepare_json_dataset
 
 @dataclass
 class InferenceConfig:
     max_n_nodes = None
-    data_filepath = 'data/dataset/lobsters.json'
+    data_filepath = 'data/dataset/'
+    data_name = 'Community_small'
     scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
-    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_50_r2.pth'
+    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
+    output_filepath = 'data/dataset/output_25000_pgsn_no_tanh.json'
     eta = 0 # DDPM
 
-    device = 'mps'
+    device = 'cpu'
 
     # lobster dynamics
     in_node_nf = 4
@@ -28,52 +31,52 @@ class InferenceConfig:
     aggregation_method='sum'
 
 config = InferenceConfig()
-lobster_list = get_lobsters_from_json(config.data_filepath)
-max_n_nodes, _, _, _ = get_max_params(lobster_list)
-config.max_n_nodes = max_n_nodes
+# lobster_list, max_n_nodes = load_data(config.data_filepath)
+train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(config.data_filepath, 
+                                                                    config.data_name,
+                                                                    device=config.device)
+config.max_n_nodes = max_n_nodes = len(n_node_pmf)
 
 # https://huggingface.co/papers/2305.08891 
 noise_scheduler = DDIMScheduler.from_pretrained(config.scheduler_filepath, 
-                                                rescale_betas_zero_snr=True, 
+                                                rescale_betas_zero_snr=False, # keep false
                                                 timestep_spacing="trailing")
 
-model = LobsterDynamics(in_node_nf=config.in_node_nf, 
-                        in_edge_nf=config.in_edge_nf, 
-                        hidden_nf=config.hidden_nf, 
-                        device=config.device,
-                        act_fn=config.act_fn, 
-                        n_layers=config.n_layers, 
-                        attention=config.attention,
-                        normalization_factor=config.normalization_factor, 
-                        aggregation_method=config.aggregation_method)
-
+model = PGSN(max_node=max_n_nodes)
 model = torch.load(config.checkpoint_filepath)
 model.eval()
 
-n = 20
-s = 1000 # num inference steps
+# weights = torch.zeros(max_n_nodes + 1, dtype=torch.float)
+# for lobster in lobster_list:
+#     weights[lobster.card] += 1
 
-nodes, edges = sample(config=config, 
-                        model=model, 
-                        noise_scheduler=noise_scheduler, 
-                        num_inference_steps=s,
-                        n=n)
+s = 25 # num inference steps
+N = 250
 
-nodes = nodes[:n]
-edges = edges[:n * (n-1)]
+sample_node_num = torch.multinomial(torch.Tensor(n_node_pmf), N, replacement=True)
 
-import matplotlib.pyplot as plt
+pred_adj_list = []
+for i in range(N):
+    n = sample_node_num[i]
+    edges = sample(config=config, 
+                            model=model, 
+                            noise_scheduler=noise_scheduler, 
+                            num_inference_steps=s,
+                            n=n)
 
-fig = plt.figure(figsize=(12,12))
-ax = plt.subplot(111)
-ax.set_title('Graph - Shapes', fontsize=10)
+    edges = edges.reshape(max_n_nodes, max_n_nodes)
+    edges = edges[:n, :n]
+    edges = (edges > 0).to(torch.int64)
+    edges = edges + edges.T
+    pred_adj_list.append(edges.numpy())
+    print(edges)
+    if i % 50 == 0:
+        print(i)
+    quit()
 
-G = decode(node_features=nodes, edge_features=edges)
-pos = nx.spring_layout(G)
-nx.draw(G, pos)
-
-plt.tight_layout()
-plt.show()
+pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
+pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
+prepare_json_dataset(pred_adj_list, config.output_filepath)
 
 
 

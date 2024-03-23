@@ -3,3 +3,4 @@ networkx
 diffusers
 accelerate
 torch_geometric
+click
