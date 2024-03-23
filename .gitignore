@@ -1,4 +1,4 @@
-data/dataset
+# data/dataset
 test.ipynb
 .env
 diffusion/models
