@@ -3,4 +3,7 @@ networkx
 diffusers
 accelerate
 torch_geometric
+torch_scatter
+pandas
+wandb
 click

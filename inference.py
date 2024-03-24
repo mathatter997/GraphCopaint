@@ -13,9 +13,11 @@ class InferenceConfig:
     max_n_nodes = None
     data_filepath = 'data/dataset/'
     data_name = 'Community_small'
-    scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
-    checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
-    output_filepath = 'data/dataset/output_25000_pgsn_no_tanh.json'
+    # scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
+    # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
+    scheduler_filepath = 'models/Community_small/scheduler_config.json'
+    checkpoint_filepath = 'models/Community_small/gnn/checkpoint_epoch_60000psgn.pth'
+    output_filepath = 'data/dataset/output_60000_pgsn.json'
     eta = 0 # DDPM
 
     device = 'cpu'
@@ -43,7 +45,8 @@ noise_scheduler = DDIMScheduler.from_pretrained(config.scheduler_filepath,
                                                 timestep_spacing="trailing")
 
 model = PGSN(max_node=max_n_nodes)
-model = torch.load(config.checkpoint_filepath)
+checkpoint = torch.load(config.checkpoint_filepath)
+model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 
 # weights = torch.zeros(max_n_nodes + 1, dtype=torch.float)
@@ -69,10 +72,9 @@ for i in range(N):
     edges = (edges > 0).to(torch.int64)
     edges = edges + edges.T
     pred_adj_list.append(edges.numpy())
-    print(edges)
-    if i % 50 == 0:
-        print(i)
-    quit()
+    # print(edges)
+    # if i % 50 == 0:
+    #     print(i)
 
 pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
 pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
