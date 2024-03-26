@@ -16,8 +16,8 @@ class InferenceConfig:
     # scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
     # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
     scheduler_filepath = 'models/Community_small/scheduler_config.json'
-    checkpoint_filepath = 'models/Community_small/gnn/checkpoint_epoch_60000psgn.pth'
-    output_filepath = 'data/dataset/output_60000_pgsn.json'
+    checkpoint_filepath = 'models/Community_small/gnn/checkpoint_epoch_250000_t50_psgn.pth'
+    output_filepath = 'data/dataset/output_250000_t50_pgsn.json'
     eta = 0 # DDPM
 
     device = 'cpu'
@@ -45,7 +45,8 @@ noise_scheduler = DDIMScheduler.from_pretrained(config.scheduler_filepath,
                                                 timestep_spacing="trailing")
 
 model = PGSN(max_node=max_n_nodes)
-checkpoint = torch.load(config.checkpoint_filepath)
+checkpoint = torch.load(config.checkpoint_filepath,
+                         map_location=torch.device('cpu'))
 model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 

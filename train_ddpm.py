@@ -11,7 +11,7 @@ from data.data_loader import load_data
 from torch_geometric.loader import DataLoader
 from data.dataset import get_dataset
 from diffusion.pgsn import PGSN
-from diffusers.optimization import get_cosine_schedule_with_warmup
+from diffusers.optimization import get_cosine_schedule_with_warmup, get_constant_schedule
 
 
 @click.command()
@@ -38,15 +38,13 @@ def train_ddpm(
         num_epochs = 250000
         start_epoch = 0
         gradient_accumulation_steps = 1
-        learning_rate = 1e-5
+        learning_rate = 2e-5
         lr_warmup_steps = 500
         # save_image_epochs = 10000
         save_model_epochs = 10000
         train_timesteps = 1000
-        mixed_precision = "no"  # `no` for float32, `fp16` for automatic mixed precision
+        mixed_precision = "no"
         start = 0
-        # load_model_dir = 'gnn/checkpoint_epoch_1psgn_no_tanh.pth'
-        # load_model_dir = None
         checkpoint_path = None
 
         output_dir = "diffusion/models/"  # the model name locally and on the HF Hub
@@ -70,7 +68,7 @@ def train_ddpm(
         # normalization_factor=100
         # aggregation_method='sum'
 
-        # ema_rate = 0.9999
+        ema_rate = 0.9999
         normalization = "GroupNorm"
         nonlinearity = "swish"
         nf = 256
@@ -90,6 +88,8 @@ def train_ddpm(
     config.checkpoint_path = checkpoint_path
     config.output_dir = f"models/{data_name}/"
     config.train_timesteps = train_timesteps
+    config.label = f"_t{train_timesteps}_psgn"
+
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
@@ -109,7 +109,7 @@ def train_ddpm(
         train_dataset, batch_size=config.train_batch_size, shuffle=True
     )  # load lobsters
     model = PGSN(max_node=max_n_nodes)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
     if checkpoint_path:
         # checkpoint = torch.load(config.output_dir + config.load_model_dir)
@@ -124,10 +124,14 @@ def train_ddpm(
         beta_schedule="squaredcos_cap_v2",
     )
 
-    lr_scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=config.lr_warmup_steps,
-        num_training_steps=(len(dataloader) * config.num_epochs),
+    # lr_scheduler = get_cosine_schedule_with_warmup(
+    #     optimizer=optimizer,
+    #     num_warmup_steps=config.lr_warmup_steps,
+    #     num_training_steps=(len(dataloader) * config.num_epochs),
+    # )
+
+    lr_scheduler = get_constant_schedule(
+        optimizer = optimizer,
     )
 
     # config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)

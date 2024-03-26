@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from .utils import dense_adj
 from tqdm.auto import tqdm
-
+from .ema import ExponentialMovingAverage
 
 def train_loop(
     config,
@@ -46,6 +46,8 @@ def train_loop(
     max_n_nodes = config.max_n_nodes
     global_step = 0
 
+    ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_rate)
+
     # [0,1] -> [-1, 1]
     scale_data = lambda x: 2.0 * x - 1
 
@@ -80,6 +82,7 @@ def train_loop(
 
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)
+                ema.update(model.parameters())
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
@@ -115,6 +118,7 @@ def train_loop(
                                 model
                             ).state_dict(),
                             "optimizer_state_dict": optimizer.state_dict(),
+                            "ema_state_dict": ema.state_dict(),
                         },
                         file_path,
                     )
