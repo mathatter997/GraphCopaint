@@ -33,13 +33,13 @@ def train_ddpm(
         max_n_nodes = None
         data_filepath = "data/dataset/"
         data_name = "Community_small"
-        train_batch_size = 16
+        train_batch_size = 32
         eval_batch_size = 2  # how many to sample during evaluation
         num_epochs = 250000
         start_epoch = 0
         gradient_accumulation_steps = 1
         learning_rate = 2e-5
-        lr_warmup_steps = 500
+        # lr_warmup_steps = 500
         # save_image_epochs = 10000
         save_model_epochs = 10000
         train_timesteps = 1000
@@ -71,13 +71,13 @@ def train_ddpm(
         ema_rate = 0.9999
         normalization = "GroupNorm"
         nonlinearity = "swish"
-        nf = 256
+        nf = 128
         num_gnn_layers = 4
         size_cond = False
         embedding_type = "positional"
-        rw_depth = 32
+        rw_depth = 16
         graph_layer = "PosTransLayer"
-        edge_th = 0.2
+        edge_th = -1
         heads = 8
         attn_clamp = False
 

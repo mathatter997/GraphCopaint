@@ -16,7 +16,8 @@ def get_stats_eval(mmd_distance, eval_max_subgraph=False):
         raise ValueError
 
     def eval_stats_fn(test_dataset, pred_graph_list):
-        pred_G = [to_networkx(pred_graph_list[i], to_undirected=True, remove_self_loops=True)
+        pred_G = [to_networkx(pred_graph_list[i], to_undirected=True, remove_self_loops=True) if len(pred_graph_list[i].edge_index)
+                  else nx.empty_graph(range(pred_graph_list[i].card))
                   for i in range(len(pred_graph_list))]
         sub_pred_G = []
         if eval_max_subgraph:

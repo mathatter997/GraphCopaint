@@ -74,10 +74,15 @@ def sample(
             time = t.to(device=config.device).reshape(-1)
             edge_noise_res = model(adj_t, time, mask=adj_mask)
 
+        # adj_t = noise_scheduler.step(
+        #     edge_noise_res, t, adj_t, eta=config.eta
+        # ).prev_sample
+        edge_noise_res = noise_scheduler.scale_model_input(edge_noise_res, t)
         adj_t = noise_scheduler.step(
-            edge_noise_res, t, adj_t, eta=config.eta
+            edge_noise_res, t, adj_t
         ).prev_sample
-        adj_t = torch.clip(adj_t, -3, 3)
+        # print(torch.norm(adj_t))
+        # adj_t = torch.clip(adj_t, -3, 3)
         # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
         #     g = (input_e + 1) / 2  * adj_mask
         #     g = (g[:, :, :n, :n]).view(n,n)

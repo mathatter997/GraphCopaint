@@ -2,11 +2,12 @@ import torch
 import networkx as nx 
 from diffusion.pgsn import PGSN
 from dataclasses import dataclass
-from diffusers import DDIMScheduler
+from diffusers import DDIMScheduler, DDPMScheduler, EulerDiscreteScheduler
 from data.dataset import get_dataset
 from data.data_loader import load_data
 from diffusion.ddim_sample import sample
 from data.utils import Lobster, prepare_json_dataset
+from diffusion.ema import ExponentialMovingAverage
 
 @dataclass
 class InferenceConfig:
@@ -16,9 +17,11 @@ class InferenceConfig:
     # scheduler_filepath = "diffusion/models/scheduler_config.json"  # the model name locally and on the HF Hub
     # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
     scheduler_filepath = 'models/Community_small/scheduler_config.json'
-    checkpoint_filepath = 'models/Community_small/gnn/checkpoint_epoch_250000_t50_psgn.pth'
-    output_filepath = 'data/dataset/output_250000_t50_pgsn.json'
-    eta = 0 # DDPM
+    checkpoint_filepath = 'models/Community_small/gnn/checkpoint_epoch_230000_t1000_psgn.pth'
+    output_filepath = 'data/dataset/output_230000_t1000_ema_pgsn.json'
+    eta = 0 # DDIM
+    eta = 1
+    ema = True
 
     device = 'cpu'
 
@@ -44,17 +47,26 @@ noise_scheduler = DDIMScheduler.from_pretrained(config.scheduler_filepath,
                                                 rescale_betas_zero_snr=False, # keep false
                                                 timestep_spacing="trailing")
 
+noise_scheduler = DDPMScheduler.from_pretrained(config.scheduler_filepath, 
+                                                rescale_betas_zero_snr=False, # keep false
+                                                timestep_spacing="trailing")
+
 model = PGSN(max_node=max_n_nodes)
 checkpoint = torch.load(config.checkpoint_filepath,
                          map_location=torch.device('cpu'))
-model.load_state_dict(checkpoint['model_state_dict'])
+if config.ema:
+    ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
+    ema.load_state_dict(checkpoint['ema_state_dict'])
+    ema.copy_to(model.parameters())
+else:
+    model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 
 # weights = torch.zeros(max_n_nodes + 1, dtype=torch.float)
 # for lobster in lobster_list:
 #     weights[lobster.card] += 1
 
-s = 25 # num inference steps
+s = 1000 # num inference steps
 N = 250
 
 sample_node_num = torch.multinomial(torch.Tensor(n_node_pmf), N, replacement=True)

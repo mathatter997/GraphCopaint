@@ -11,7 +11,7 @@ eval_fn = get_stats_eval('rbf', eval_max_subgraph=False)
 
 test_filepath = 'data/dataset/'
 test_filename = 'Community_small'
-pred_filepath = 'data/dataset/output_250000_t50_pgsn.json'
+pred_filepath = 'data/dataset/output_230000_t1000_ema_pgsn.json'
 
 # test_graphs, _ = load_data(test_filepath)
 # pred_graphs, _ = load_data(pred_filepath)
@@ -33,10 +33,14 @@ pred_graphs, _ = load_data(pred_filepath)
 
 for i,graph  in enumerate(pred_graphs):
     edge_index = graph.edge_index
-    reverse_edge_index = torch.stack([edge_index[1], edge_index[0]], dim=0)
-    edge_index = torch.cat([edge_index, reverse_edge_index], dim=1)
-    temp = Data(edge_index=edge_index)
-    pred_graphs[i] = temp
+    if len(edge_index):
+        reverse_edge_index = torch.stack([edge_index[1], edge_index[0]], dim=0)
+        edge_index = torch.cat([edge_index, reverse_edge_index], dim=1)
+        temp = Data(edge_index=edge_index)
+        pred_graphs[i] = temp
+
+
+    # temp = Data(edge_index=edge_index)
 
 results = eval_fn(test_dataset=train_dataset, pred_graph_list=test_dataset)
 print(results)
@@ -45,5 +49,5 @@ print(results)
 # results = eval_fn(test_dataset=test_graphs[:half], pred_graph_list=test_graphs[half:])
 # print(results)
 
-results = eval_fn(test_dataset=pred_graphs, pred_graph_list=test_dataset)
+results = eval_fn(test_dataset=train_dataset, pred_graph_list=pred_graphs)
 print(results)

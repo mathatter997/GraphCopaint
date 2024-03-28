@@ -39,7 +39,6 @@ class Descriptor():
         """
 
         graph_pred_list = [G for G in graph_pred_list if not G.number_of_nodes() == 0]
-
         sample_pred = self.extract_features(graph_pred_list)
         sample_ref = self.extract_features(graph_ref_list)
 
