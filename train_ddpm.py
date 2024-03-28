@@ -11,7 +11,10 @@ from data.data_loader import load_data
 from torch_geometric.loader import DataLoader
 from data.dataset import get_dataset
 from diffusion.pgsn import PGSN
-from diffusers.optimization import get_cosine_schedule_with_warmup, get_constant_schedule
+from diffusers.optimization import (
+    get_cosine_schedule_with_warmup,
+    get_constant_schedule,
+)
 
 
 @click.command()
@@ -79,6 +82,7 @@ def train_ddpm(
         graph_layer = "PosTransLayer"
         edge_th = -1
         heads = 8
+        dropout=0.1
         attn_clamp = False
 
     config = TrainingConfig()
@@ -89,7 +93,6 @@ def train_ddpm(
     config.output_dir = f"models/{data_name}/"
     config.train_timesteps = train_timesteps
     config.label = f"_t{train_timesteps}_psgn"
-
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
@@ -108,7 +111,18 @@ def train_ddpm(
     dataloader = DataLoader(
         train_dataset, batch_size=config.train_batch_size, shuffle=True
     )  # load lobsters
-    model = PGSN(max_node=max_n_nodes)
+    model = PGSN(
+        max_node=max_n_nodes,
+        nf=config.nf,
+        num_gnn_layers=config.num_gnn_layers,
+        embedding_type=config.embedding_type,
+        rw_depth=config.rw_depth,
+        graph_layer=config.graph_layer,
+        edge_th=config.edge_th,
+        heads=config.heads,
+        dropout=config.dropout,
+        attn_clamp=config.attn_clamp
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
     if checkpoint_path:
@@ -131,7 +145,7 @@ def train_ddpm(
     # )
 
     lr_scheduler = get_constant_schedule(
-        optimizer = optimizer,
+        optimizer=optimizer,
     )
 
     # config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
