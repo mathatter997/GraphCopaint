@@ -12,6 +12,7 @@ def train_loop(
     model,
     noise_scheduler,
     optimizer,
+    ema,
     train_dataloader,
     lr_scheduler,
     accelerator,
@@ -45,8 +46,6 @@ def train_loop(
 
     max_n_nodes = config.max_n_nodes
     global_step = 0
-
-    ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_rate)
 
     # [0,1] -> [-1, 1]
     scale_data = lambda x: 2.0 * x - 1

@@ -19,11 +19,11 @@ class InferenceConfig:
     # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
     scheduler_filepath = "models/Community_small/scheduler_config.json"
     checkpoint_filepath = (
-        "models/Community_small/gnn/checkpoint_epoch_230000_t1000_psgn.pth"
+        "models/Community_small/gnn/checkpoint_epoch_160000_t1000_psgn_v2.pth"
     )
-    output_filepath = "data/dataset/output_230000_t1000_ema_pgsn.json"
+    output_filepath = "data/dataset/output_160000_t1000_ema_pgsn_v2.json"
     eta = 0  # DDIM
-    eta = 1
+    # eta = 1
     ema = True
 
     device = "cpu"
@@ -32,6 +32,7 @@ class InferenceConfig:
     normalization = "GroupNorm"
     nonlinearity = "swish"
     nf = 128
+    nf= 256
     num_gnn_layers = 4
     size_cond = False
     embedding_type = "positional"

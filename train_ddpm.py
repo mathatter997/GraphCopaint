@@ -11,6 +11,7 @@ from data.data_loader import load_data
 from torch_geometric.loader import DataLoader
 from data.dataset import get_dataset
 from diffusion.pgsn import PGSN
+from diffusion.ema import ExponentialMovingAverage
 from diffusers.optimization import (
     get_cosine_schedule_with_warmup,
     get_constant_schedule,
@@ -124,13 +125,13 @@ def train_ddpm(
         attn_clamp=config.attn_clamp
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
-
+    ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_rate)
     if checkpoint_path:
         # checkpoint = torch.load(config.output_dir + config.load_model_dir)
         checkpoint = torch.load(checkpoint_path)
-        print(checkpoint.keys())
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        ema.load_state_dict(checkpoint['ema_state_dict'])
         config.start_epoch = checkpoint["epoch"] + 1
 
     noise_scheduler = DDPMScheduler(
@@ -154,6 +155,7 @@ def train_ddpm(
         model=model,
         noise_scheduler=noise_scheduler,
         optimizer=optimizer,
+        ema=ema,
         train_dataloader=dataloader,
         lr_scheduler=lr_scheduler,
         accelerator=accelerator,

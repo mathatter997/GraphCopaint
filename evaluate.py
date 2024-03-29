@@ -11,7 +11,7 @@ eval_fn = get_stats_eval('rbf', eval_max_subgraph=False)
 
 test_filepath = 'data/dataset/'
 test_filename = 'Community_small'
-pred_filepath = 'data/dataset/output_230000_t1000_ema_pgsn.json'
+pred_filepath = 'data/dataset/output_160000_t1000_ema_pgsn_v2.json'
 
 # test_graphs, _ = load_data(test_filepath)
 # pred_graphs, _ = load_data(pred_filepath)
