@@ -39,7 +39,7 @@ def train_ddpm(
         data_name = "Community_small"
         train_batch_size = 32
         eval_batch_size = 2  # how many to sample during evaluation
-        num_epochs = 250000
+        num_epochs = 400000
         start_epoch = 0
         gradient_accumulation_steps = 1
         learning_rate = 2e-5
