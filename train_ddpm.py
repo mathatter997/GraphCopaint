@@ -75,7 +75,7 @@ def train_ddpm(
         ema_rate = 0.9999
         normalization = "GroupNorm"
         nonlinearity = "swish"
-        nf = 128
+        nf = 256
         num_gnn_layers = 4
         size_cond = False
         embedding_type = "positional"
