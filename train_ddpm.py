@@ -42,16 +42,14 @@ def train_ddpm(
         num_epochs = 400000
         start_epoch = 0
         gradient_accumulation_steps = 1
-        learning_rate = 2e-5
-        # lr_warmup_steps = 500
-        # save_image_epochs = 10000
+        learning_rate = 5e-6
         save_model_epochs = 10000
         train_timesteps = 1000
         mixed_precision = "no"
         start = 0
         checkpoint_path = None
 
-        output_dir = "diffusion/models/"  # the model name locally and on the HF Hub
+        output_dir = "models/"  # the model name locally and on the HF Hub
         output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
         label = f"_t{train_timesteps}_psgn"
 
@@ -61,28 +59,17 @@ def train_ddpm(
             True  # overwrite the old model when re-running the notebook
         )
         seed = 0
-
-        # lobster dynamics
-        # in_node_nf = 4
-        # in_edge_nf = 1
-        # hidden_nf=64
-        # act_fn=torch.nn.SiLU()
-        # n_layers=4
-        # attention=False
-        # normalization_factor=100
-        # aggregation_method='sum'
-
         ema_rate = 0.9999
         normalization = "GroupNorm"
         nonlinearity = "swish"
-        nf = 256
+        nf = 384
         num_gnn_layers = 4
         size_cond = False
         embedding_type = "positional"
         rw_depth = 16
         graph_layer = "PosTransLayer"
         edge_th = -1
-        heads = 8
+        heads = 12
         dropout=0.1
         attn_clamp = False
 
@@ -93,7 +80,7 @@ def train_ddpm(
     config.checkpoint_path = checkpoint_path
     config.output_dir = f"models/{data_name}/"
     config.train_timesteps = train_timesteps
-    config.label = f"_t{train_timesteps}_psgn"
+    config.label = f"_t{train_timesteps}_psgn_v3"
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
@@ -103,15 +90,13 @@ def train_ddpm(
         cpu=cpu,
     )
 
-    # lobster_list, max_n_nodes = load_data(config.data_filepath)
     train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
         config.data_filepath, config.data_name, device=accelerator.device
     )
     config.max_n_nodes = max_n_nodes = len(n_node_pmf)
-
-    dataloader = DataLoader(
+    train_dataloader = DataLoader(
         train_dataset, batch_size=config.train_batch_size, shuffle=True
-    )  # load lobsters
+    ) 
     model = PGSN(
         max_node=max_n_nodes,
         nf=config.nf,
@@ -125,6 +110,12 @@ def train_ddpm(
         attn_clamp=config.attn_clamp
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    lr_scheduler = get_constant_schedule(
+        optimizer=optimizer,
+    )
+    model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        model, optimizer, train_dataloader, lr_scheduler
+    )
     ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_rate)
     if checkpoint_path:
         # checkpoint = torch.load(config.output_dir + config.load_model_dir)
@@ -139,16 +130,6 @@ def train_ddpm(
         beta_schedule="squaredcos_cap_v2",
     )
 
-    # lr_scheduler = get_cosine_schedule_with_warmup(
-    #     optimizer=optimizer,
-    #     num_warmup_steps=config.lr_warmup_steps,
-    #     num_training_steps=(len(dataloader) * config.num_epochs),
-    # )
-
-    lr_scheduler = get_constant_schedule(
-        optimizer=optimizer,
-    )
-
     # config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
     train_loop(
         config=config,
@@ -156,7 +137,7 @@ def train_ddpm(
         noise_scheduler=noise_scheduler,
         optimizer=optimizer,
         ema=ema,
-        train_dataloader=dataloader,
+        train_dataloader=train_dataloader,
         lr_scheduler=lr_scheduler,
         accelerator=accelerator,
         label=config.label,
