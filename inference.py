@@ -19,9 +19,9 @@ class InferenceConfig:
     # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
     scheduler_filepath = "models/Community_small/scheduler_config.json"
     checkpoint_filepath = (
-        "models/Community_small/gnn/checkpoint_epoch_160000_t1000_psgn_v2.pth"
+        "models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn_v2.pth"
     )
-    output_filepath = "data/dataset/output_160000_t1000_ema_pgsn_v2.json"
+    output_filepath = "data/dataset/output_400000_t1000_ema_pgsn_v2.json"
     eta = 0  # DDIM
     # eta = 1
     ema = True
@@ -33,6 +33,7 @@ class InferenceConfig:
     nonlinearity = "swish"
     nf = 128
     nf= 256
+    # nf = 384
     num_gnn_layers = 4
     size_cond = False
     embedding_type = "positional"
@@ -40,6 +41,7 @@ class InferenceConfig:
     graph_layer = "PosTransLayer"
     edge_th = -1
     heads = 8
+    # heads = 12
     dropout = 0.1
     attn_clamp = False
 

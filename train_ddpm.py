@@ -42,7 +42,7 @@ def train_ddpm(
         num_epochs = 400000
         start_epoch = 0
         gradient_accumulation_steps = 1
-        learning_rate = 5e-6
+        learning_rate = 5e-5
         save_model_epochs = 10000
         train_timesteps = 1000
         mixed_precision = "no"
@@ -62,14 +62,14 @@ def train_ddpm(
         ema_rate = 0.9999
         normalization = "GroupNorm"
         nonlinearity = "swish"
-        nf = 384
+        nf = 256
         num_gnn_layers = 4
         size_cond = False
         embedding_type = "positional"
-        rw_depth = 16
+        rw_depth = 32
         graph_layer = "PosTransLayer"
-        edge_th = -1
-        heads = 12
+        edge_th = 0.2
+        heads = 8
         dropout=0.1
         attn_clamp = False
 
@@ -80,7 +80,7 @@ def train_ddpm(
     config.checkpoint_path = checkpoint_path
     config.output_dir = f"models/{data_name}/"
     config.train_timesteps = train_timesteps
-    config.label = f"_t{train_timesteps}_psgn_v3"
+    config.label = f"_t{train_timesteps}_psgn_v4"
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
