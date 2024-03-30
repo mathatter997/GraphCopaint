@@ -91,6 +91,7 @@ def train_loop(
                 "loss": loss.detach().item(),
                 "lr": lr_scheduler.get_last_lr()[0],
                 "step": global_step,
+                "epoch": epoch,
             }
             wandb.log(logs)
             progress_bar.set_postfix(**logs)
