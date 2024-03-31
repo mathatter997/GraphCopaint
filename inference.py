@@ -19,9 +19,9 @@ class InferenceConfig:
     # checkpoint_filepath = 'diffusion/models/gnn/checkpoint_epoch_25000psgn_no_tanh.pth'
     scheduler_filepath = "models/Community_small/scheduler_config.json"
     checkpoint_filepath = (
-        "models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn_v2.pth"
+        "models/Community_small/gnn/checkpoint_epoch_280000_t1000_psgn_v5.pth"
     )
-    output_filepath = "data/dataset/output_400000_t1000_ema_pgsn_v2.json"
+    output_filepath = "data/dataset/output_280000_t1000_ema_pgsn_v5.json"
     eta = 0  # DDIM
     # eta = 1
     ema = True

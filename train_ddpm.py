@@ -16,71 +16,34 @@ from diffusers.optimization import (
     get_cosine_schedule_with_warmup,
     get_constant_schedule,
 )
+from configs.com_small import CommunitySmallConfig
+from configs.ego_small import EgoSmallConfig
+from configs.ego import EgoConfig
+from configs.enzyme import EnzymeConfig
 
 
 @click.command()
 @click.option("--checkpoint_path", default=None)
-@click.option(
-    "--mixed_precision",
-    default="no",
-    type=click.Choice(["yes", "no"], case_sensitive=False),
+@click.option("--config_type",
+              default='community_small',
+              type=click.Choice(['community_small',
+                                 'ego_small',
+                                 'ego',
+                                 'enzyme'], case_sensitive=False),
 )
 @click.option("--cpu", default=False)
-@click.option("--data_filepath")
-@click.option("--data_name")
-@click.option("--train_timesteps", default=1000)
 def train_ddpm(
-    checkpoint_path, mixed_precision, cpu, data_filepath, data_name, train_timesteps
+    checkpoint_path, cpu, config_type
 ):
-    @dataclass
-    class TrainingConfig:
-        max_n_nodes = None
-        data_filepath = "data/dataset/"
-        data_name = "Community_small"
-        train_batch_size = 32
-        eval_batch_size = 2  # how many to sample during evaluation
-        num_epochs = 400000
-        start_epoch = 0
-        gradient_accumulation_steps = 1
-        learning_rate = 2e-5
-        save_model_epochs = 10000
-        train_timesteps = 1000
-        mixed_precision = "no"
-        start = 0
-        checkpoint_path = None
-
-        output_dir = "models/"  # the model name locally and on the HF Hub
-        output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
-        label = f"_t{train_timesteps}_psgn"
-
-        push_to_hub = False  # whether to upload the saved model to the HF Hub
-        hub_private_repo = False
-        overwrite_output_dir = (
-            True  # overwrite the old model when re-running the notebook
-        )
-        seed = 0
-        ema_rate = 0.9999
-        normalization = "GroupNorm"
-        nonlinearity = "swish"
-        nf = 256
-        num_gnn_layers = 4
-        size_cond = False
-        embedding_type = "positional"
-        rw_depth = 16
-        graph_layer = "PosTransLayer"
-        edge_th = -1
-        heads = 8
-        dropout=0.1
-        attn_clamp = False
-
-    config = TrainingConfig()
-    config.mixed_precision = mixed_precision
-    config.data_filepath = data_filepath
-    config.data_name = data_name
+    if config_type == 'community_small':
+        config = CommunitySmallConfig()
+    elif config_type == 'ego_small':
+        config = EgoSmallConfig()
+    elif config_type == 'ego':
+        config = EgoConfig()
+    elif config_type == 'enzyme':
+        config = EnzymeConfig()
     config.checkpoint_path = checkpoint_path
-    config.output_dir = f"models/{data_name}/"
-    config.train_timesteps = train_timesteps
-    config.label = f"_t{train_timesteps}_psgn_v5"
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
@@ -128,7 +91,9 @@ def train_ddpm(
     noise_scheduler = DDPMScheduler(
         num_train_timesteps=config.train_timesteps,
         # beta_schedule="squaredcos_cap_v2",
-        beta_schedule="linear"
+        beta_schedule="linear",
+        beta_start=config.beta_start,
+        beta_end=config.beta_end,
     )
 
     # config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
