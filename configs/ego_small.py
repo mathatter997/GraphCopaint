@@ -17,7 +17,7 @@ class EgoSmallConfig:
     start = 0
     checkpoint_path = None
 
-    output_dir = f"models/{data_name}"  # the model name locally and on the HF Hub
+    output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
     label = f"_t{train_timesteps}_psgn"
 

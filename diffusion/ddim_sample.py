@@ -48,6 +48,7 @@ def sample(
     config,
     model,
     noise_scheduler,
+    accelerator,
     num_inference_steps=1000,
     inference_timesteps=None,
     n=1,
@@ -59,29 +60,28 @@ def sample(
     else:
         noise_scheduler.num_inference_steps = len(inference_timesteps)
         noise_scheduler.timesteps = torch.from_numpy(inference_timesteps).to(
-            config.device
+            accelerator.device
         )
 
     adj_shape = (1, 1, config.max_n_nodes, config.max_n_nodes)
-    adj_t = torch.randn(adj_shape, device=config.device)
+    adj_t = torch.randn(adj_shape, device=accelerator.device)
 
-    adj_mask = torch.ones(adj_shape, device=config.device)
+    adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
     adj_mask[:, :, n:] = 0
     for t in noise_scheduler.timesteps:
         adj_t = adj_t * adj_mask
         with torch.no_grad():
-            time = t.to(device=config.device).reshape(-1)
+            time = t.to(device=accelerator.device).reshape(-1)
             edge_noise_res = model(adj_t, time, mask=adj_mask)
-
         # adj_t = noise_scheduler.step(
         #     edge_noise_res, t, adj_t, eta=config.eta
         # ).prev_sample
-        edge_noise_res = noise_scheduler.scale_model_input(edge_noise_res, t)
+        # edge_noise_res = noise_scheduler.scale_model_input(edge_noise_res, t)
         adj_t = noise_scheduler.step(
             edge_noise_res, t, adj_t
         ).prev_sample
-        # print(torch.norm(adj_t))
+        # adj_t = torch.clip(adj_t, -3, 3)
         # adj_t = torch.clip(adj_t, -3, 3)
         # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
         #     g = (input_e + 1) / 2  * adj_mask
@@ -102,6 +102,7 @@ def copaint(
     config,
     model,
     noise_scheduler,
+    accelerator,
     num_inference_steps=1000,
     inference_timesteps=None,
     interval_num=1,
@@ -131,15 +132,15 @@ def copaint(
     else:
         noise_scheduler.num_inference_steps = len(inference_timesteps)
         noise_scheduler.timesteps = torch.from_numpy(inference_timesteps).to(
-            config.device
+            accelerator.device
         )
 
     original_timesteps = torch.copy(noise_scheduler.timesteps)
 
     adj_shape = (1, 1, config.max_n_nodes, config.max_n_nodes)
-    adj_t = torch.randn(adj_shape, device=config.device)
+    adj_t = torch.randn(adj_shape, device=accelerator.device)
 
-    adj_mask = torch.ones(adj_shape, device=config.device)
+    adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
     adj_mask[:, :, n:] = 0
 
@@ -155,7 +156,7 @@ def copaint(
         if interval_num > 1:
             timesteps = np.linspace(0, prev_t.item(), interval_num + 1, dtype=int)
             noise_scheduler.num_inference_steps = len(timesteps)
-            noise_scheduler.timesteps = torch.from_numpy(timesteps).to(config.device)
+            noise_scheduler.timesteps = torch.from_numpy(timesteps).to(accelerator.device)
 
         for _ in range(k):
             # optimize x_t given x_0
@@ -166,7 +167,7 @@ def copaint(
                 origin_adj = adj_t.clone().detach()
                 adj_t = adj_t.detach().requires_grad_()
 
-                time = t.to(device=config.device).reshape(-1)
+                time = t.to(device=accelerator.device).reshape(-1)
                 adj_noise_res = model(adj_t, time, mask=adj_mask)
 
                 step = noise_scheduler.step(
@@ -223,7 +224,7 @@ def copaint(
             if time_travel:
                 if optimize_before_time_travel:
                     pass
-                noise = torch.randn(adj_t.shape, device=config.device)
+                noise = torch.randn(adj_t.shape, device=accelerator.device)
                 noise_scheduler.alphas_cumprod = noise_scheduler.alphas_cumprod.to(
                     device=adj_t.device
                 )
