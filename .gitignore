@@ -5,3 +5,4 @@ diffusion/models
 models
 wandb
 edges
+data/dataset/*.json
