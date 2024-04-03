@@ -14,6 +14,7 @@ from configs.com_small import CommunitySmallConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
+import time 
 
 
 @click.command()
@@ -134,4 +135,7 @@ def inference(
 
 
 if __name__ == "__main__":
+    tstart = time.time()
     inference()
+    tend = time.time()
+    print(f'{tend-tstart:.4f} seconds')
