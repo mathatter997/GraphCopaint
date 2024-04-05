@@ -59,7 +59,7 @@ def train_loop(
         for step, batch in enumerate(train_dataloader):
             adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
             edge_noise = torch.randn(adj.shape, device=accelerator.device)
-
+            
             timesteps = torch.randint(
                 0,
                 noise_scheduler.config.num_train_timesteps,

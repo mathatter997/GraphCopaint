@@ -4,7 +4,8 @@ import click
 import networkx as nx
 from accelerate import Accelerator
 from diffusion.pgsn import PGSN
-from diffusers import DDIMScheduler, DDPMScheduler, EulerDiscreteScheduler
+from diffusers import DDIMScheduler, DDPMScheduler
+from vpsde import ScoreSdeVpScheduler
 from data.dataset import get_dataset
 from data.data_loader import load_data
 from diffusion.ddim_sample import sample
@@ -33,7 +34,7 @@ import time
 @click.option(
     "--sampler",
     default="ddpm",
-    type=click.Choice(["ddpm", "ddim"], case_sensitive=False),
+    type=click.Choice(["ddpm", "ddim", "vpsde"], case_sensitive=False),
 )
 @click.option("--num_samples", default=1000)
 @click.option("--num_timesteps", default=1000)
@@ -68,7 +69,7 @@ def inference(
         config.data_filepath, config.data_name, device=accelerator.device
     )
     config.max_n_nodes = max_n_nodes = len(n_node_pmf)
-
+    config.sampler = sampler 
     # https://huggingface.co/papers/2305.08891
     if sampler == "ddim":
         noise_scheduler = DDIMScheduler.from_pretrained(
@@ -82,6 +83,8 @@ def inference(
             rescale_betas_zero_snr=False,
             timestep_spacing="trailing",
         )
+    elif sampler == "vpsde":
+        noise_scheduler = ScoreSdeVpScheduler()
 
     model = PGSN(
         max_node=max_n_nodes,
@@ -95,23 +98,24 @@ def inference(
         dropout=config.dropout,
         attn_clamp=config.attn_clamp,
     )
-    model.to(accelerator.device)
     checkpoint = torch.load(
         checkpoint_path, map_location=torch.device(accelerator.device)
     )
 
+
     if use_ema:
         ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
-        ema.load_state_dict(checkpoint["ema_state_dict"])
+        # ema.load_state_dict(checkpoint["ema_state_dict"])
+        ema.load_state_dict(checkpoint["ema"])
         ema.copy_to(model.parameters())
     else:
         model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
-
     sample_node_num = torch.multinomial(
         torch.Tensor(n_node_pmf), num_samples, replacement=True
     )
     pred_adj_list = []
+    tstart = time.time()
     for i in range(num_samples):
         n = sample_node_num[i]
         edges = sample(
@@ -128,6 +132,8 @@ def inference(
         edges = edges + edges.T
         edges = edges.to(device='cpu')
         pred_adj_list.append(edges.numpy())
+        tnow = time.time()
+        print(i, f'{tnow-tstart:.4f} seconds')
 
     pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
     pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
@@ -135,7 +141,4 @@ def inference(
 
 
 if __name__ == "__main__":
-    tstart = time.time()
     inference()
-    tend = time.time()
-    print(f'{tend-tstart:.4f} seconds')

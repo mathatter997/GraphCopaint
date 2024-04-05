@@ -209,7 +209,7 @@ def dense_adj(graph_data, max_num_nodes, scaler=None, dequantization=False):
     adj = scaler(adj[:, None, :, :])
     # set diag = 0 in adj_mask
     adj_mask = torch.tril(adj_mask, -1)
-    # adj_mask = adj_mask + adj_mask.transpose(1, 2)
+    # adj_mask = adj_mask + adj_mask.transpose(-1, -2)
 
     return adj, adj_mask[:, None, :, :]
 

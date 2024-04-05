@@ -65,22 +65,29 @@ def sample(
 
     adj_shape = (1, 1, config.max_n_nodes, config.max_n_nodes)
     adj_t = torch.randn(adj_shape, device=accelerator.device)
-
+    
+    adj_t = torch.tril(adj_t, -1)
+    adj_t = (adj_t + adj_t.transpose(-1, -2))
+    
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
     adj_mask[:, :, n:] = 0
+    adj_mask = adj_mask + adj_mask.transpose(-1, -2)
+    num_timesteps = len(noise_scheduler.timesteps)
     for t in noise_scheduler.timesteps:
         adj_t = adj_t * adj_mask
         with torch.no_grad():
             time = t.to(device=accelerator.device).reshape(-1)
-            edge_noise_res = model(adj_t, time, mask=adj_mask)
-        # adj_t = noise_scheduler.step(
-        #     edge_noise_res, t, adj_t, eta=config.eta
-        # ).prev_sample
-        # edge_noise_res = noise_scheduler.scale_model_input(edge_noise_res, t)
-        adj_t = noise_scheduler.step(
-            edge_noise_res, t, adj_t
-        ).prev_sample
+            if config.sampler == 'vpsde':
+                edge_noise_res = model(adj_t, time * num_timesteps, mask=adj_mask)
+            else:
+                 edge_noise_res = model(adj_t, time, mask=adj_mask)
+        if config.sampler == 'vpsde':
+            adj_t, _ = noise_scheduler.step_pred(score=edge_noise_res, t=t, x=adj_t)
+        else:
+            adj_t = noise_scheduler.step(
+                edge_noise_res, t, adj_t
+            ).prev_sample
         # adj_t = torch.clip(adj_t, -3, 3)
         # adj_t = torch.clip(adj_t, -3, 3)
         # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
@@ -93,7 +100,6 @@ def sample(
         #     edges,weights = zip(*nx.get_edge_attributes(graph,'weight').items())
         #     nx.draw(graph, pos, node_color='b', edgelist=edges, edge_color=weights, width=1.0, edge_cmap=plt.cm.Blues)
         #     plt.savefig('edges/edges_{}.png'.format(t))
-
     adj_t = adj_t * adj_mask
     return adj_t
 
@@ -225,9 +231,9 @@ def copaint(
                 if optimize_before_time_travel:
                     pass
                 noise = torch.randn(adj_t.shape, device=accelerator.device)
-                noise_scheduler.alphas_cumprod = noise_scheduler.alphas_cumprod.to(
-                    device=adj_t.device
-                )
+                # noise_scheduler.alphas_cumprod = noise_scheduler.alphas_cumprod.to(
+                #     device=adj_t.device
+                # )
                 alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype)
                 alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t]
                 sqrt_alpha_prod = alpha_prod**0.5
