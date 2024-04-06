@@ -129,7 +129,7 @@ def inference(
         edges = edges.reshape(max_n_nodes, max_n_nodes)
         edges = edges[:n, :n]
         edges = (edges > 0).to(torch.int64)
-        edges = edges + edges.T
+        # edges = edges + edges.T
         edges = edges.to(device='cpu')
         pred_adj_list.append(edges.numpy())
         tnow = time.time()

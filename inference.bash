@@ -20,7 +20,7 @@
 #  --scheduler_path models/ENZYMES/scheduler_config.json \
 #  --output_path data/dataset/output_enyzme.json
 
-python inference.py --config_type community_small  --cpu True --num_samples 1000 \
+python inference.py --config_type community_small  --cpu True --num_samples 25 \
  --sampler vpsde --num_timesteps 1000 \
  --checkpoint_path models/Community_small/gnn/checkpoint_100.pth \
  --scheduler_path models/Community_small/scheduler_config.json \

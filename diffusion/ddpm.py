@@ -25,17 +25,17 @@ def train_loop(
         accelerator.init_trackers("train_example")
 
     # start a new wandb run to track this script
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="Simple Graph Diffusion",
-        # track hyperparameters and run metadata
-        config={
-            "learning_rate": config.learning_rate,
-            "architecture": "PGSN",
-            "dataset": config.data_name,
-            "epochs": config.num_epochs,
-        },
-    )
+    # wandb.init(
+    #     # set the wandb project where this run will be logged
+    #     project="Simple Graph Diffusion",
+    #     # track hyperparameters and run metadata
+    #     config={
+    #         "learning_rate": config.learning_rate,
+    #         "architecture": "PGSN",
+    #         "dataset": config.data_name,
+    #         "epochs": config.num_epochs,
+    #     },
+    # )
 
     # Prepare everything
     # There is no specific order to remember, you just need to unpack the
@@ -49,7 +49,7 @@ def train_loop(
 
     # [0,1] -> [-1, 1]
     scale_data = lambda x: 2.0 * x - 1
-
+    sqrt_2 = 2 ** 0.5
     for epoch in range(config.start_epoch, config.num_epochs):
         progress_bar = tqdm(
             total=len(train_dataloader), disable=not accelerator.is_local_main_process
@@ -59,7 +59,9 @@ def train_loop(
         for step, batch in enumerate(train_dataloader):
             adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
             edge_noise = torch.randn(adj.shape, device=accelerator.device)
-            
+            # make symmetric 
+            edge_noise = edge_noise + edge_noise.transpose(-1, -2)
+            edge_noise = edge_noise * adj_mask / sqrt_2
             timesteps = torch.randint(
                 0,
                 noise_scheduler.config.num_train_timesteps,
@@ -71,9 +73,7 @@ def train_loop(
             # Add noise to the clean images according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
             noisy_edges = noise_scheduler.add_noise(adj, edge_noise, timesteps)
-            edge_noise = edge_noise * adj_mask
             noisy_edges = noisy_edges * adj_mask
-
             with accelerator.accumulate(model):
                 # Predict the noise residual
                 noise_edge_pred = model(noisy_edges, timesteps, mask=adj_mask)

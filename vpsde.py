@@ -102,18 +102,9 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
         drift = -0.5 * beta_t * x
         diffusion = torch.sqrt(beta_t)
         drift = drift - diffusion**2 * score
-        # symmetric
-        drift = torch.tril(drift, -1)
-        drift = (drift + drift.transpose(-1, -2)) 
-       
         x_mean = x + drift * dt
-
         # add noise
-        noise = randn_tensor(x.shape, layout=x.layout, generator=generator, device=x.device, dtype=x.dtype)
-        # symmetric
-        noise = torch.tril(noise, -1)
-        noise = (noise + noise.transpose(-1, -2)) 
-       
+        noise = randn_tensor(x.shape, layout=x.layout, generator=generator, device=x.device, dtype=x.dtype)       
         x = x_mean + diffusion * math.sqrt(-dt) * noise
 
         return x, x_mean

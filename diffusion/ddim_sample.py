@@ -63,19 +63,19 @@ def sample(
             accelerator.device
         )
 
+    sqrt_2 = 2 ** 0.5
     adj_shape = (1, 1, config.max_n_nodes, config.max_n_nodes)
-    adj_t = torch.randn(adj_shape, device=accelerator.device)
-    
-    adj_t = torch.tril(adj_t, -1)
-    adj_t = (adj_t + adj_t.transpose(-1, -2))
-    
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
     adj_mask[:, :, n:] = 0
     adj_mask = adj_mask + adj_mask.transpose(-1, -2)
+    
+    adj_t = torch.randn(adj_shape, device=accelerator.device)
+    adj_t = torch.tril(adj_t, -1)
+    adj_t = (adj_t + adj_t.transpose(-1, -2)) / sqrt_2
+    adj_t = adj_t * adj_mask
     num_timesteps = len(noise_scheduler.timesteps)
     for t in noise_scheduler.timesteps:
-        adj_t = adj_t * adj_mask
         with torch.no_grad():
             time = t.to(device=accelerator.device).reshape(-1)
             if config.sampler == 'vpsde':
@@ -83,11 +83,15 @@ def sample(
             else:
                  edge_noise_res = model(adj_t, time, mask=adj_mask)
         if config.sampler == 'vpsde':
-            adj_t, _ = noise_scheduler.step_pred(score=edge_noise_res, t=t, x=adj_t)
+            adj_next, _ = noise_scheduler.step_pred(score=edge_noise_res, t=t, x=adj_t)
         else:
-            adj_t = noise_scheduler.step(
+            adj_next = noise_scheduler.step(
                 edge_noise_res, t, adj_t
             ).prev_sample
+        res = adj_next - adj_t
+        res = (res + res.transpose(-1, -2)) / sqrt_2
+        res = res * adj_mask
+        adj_t = adj_t + res
         # adj_t = torch.clip(adj_t, -3, 3)
         # adj_t = torch.clip(adj_t, -3, 3)
         # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
@@ -100,7 +104,6 @@ def sample(
         #     edges,weights = zip(*nx.get_edge_attributes(graph,'weight').items())
         #     nx.draw(graph, pos, node_color='b', edgelist=edges, edge_color=weights, width=1.0, edge_cmap=plt.cm.Blues)
         #     plt.savefig('edges/edges_{}.png'.format(t))
-    adj_t = adj_t * adj_mask
     return adj_t
 
 

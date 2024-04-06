@@ -31,6 +31,7 @@ class CommunitySmallConfig:
     normalization = "GroupNorm"
     nonlinearity = "swish"
     nf = 256
+    # nf=128
     num_gnn_layers = 4
     size_cond = False
     embedding_type = "positional"
