@@ -25,17 +25,17 @@ def train_loop(
         accelerator.init_trackers("train_example")
 
     # start a new wandb run to track this script
-    # wandb.init(
-    #     # set the wandb project where this run will be logged
-    #     project="Simple Graph Diffusion",
-    #     # track hyperparameters and run metadata
-    #     config={
-    #         "learning_rate": config.learning_rate,
-    #         "architecture": "PGSN",
-    #         "dataset": config.data_name,
-    #         "epochs": config.num_epochs,
-    #     },
-    # )
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="Simple Graph Diffusion",
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": config.learning_rate,
+            "architecture": "PGSN",
+            "dataset": config.data_name,
+            "epochs": config.num_epochs,
+        },
+    )
 
     # Prepare everything
     # There is no specific order to remember, you just need to unpack the
