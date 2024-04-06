@@ -40,3 +40,5 @@ class EgoSmallConfig:
     heads = 8
     dropout=0.1
     attn_clamp = False
+    beta_start = 0.0001
+    beta_end = 0.02
