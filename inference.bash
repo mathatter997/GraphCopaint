@@ -21,8 +21,8 @@
 #  --output_path data/dataset/output_enyzme.json
 
 python inference.py --config_type community_small  --cpu True --num_samples 25 \
- --sampler vpsde --num_timesteps 1000 \
- --checkpoint_path models/Community_small/gnn/checkpoint_100.pth \
+ --sampler ddpm --num_timesteps 1000 \
+ --checkpoint_path models/Community_small/gnn/checkpoint_epoch_80000_t1000_psgn.pth \
  --scheduler_path models/Community_small/scheduler_config.json \
  --output_path data/dataset/output_com_small_t25.json
 

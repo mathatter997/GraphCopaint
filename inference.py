@@ -105,35 +105,38 @@ def inference(
 
     if use_ema:
         ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
-        # ema.load_state_dict(checkpoint["ema_state_dict"])
-        ema.load_state_dict(checkpoint["ema"])
+        ema.load_state_dict(checkpoint["ema_state_dict"])
+        # ema.load_state_dict(checkpoint["ema"])
         ema.copy_to(model.parameters())
     else:
         model.load_state_dict(checkpoint["model_state_dict"])
+    model = accelerator.prepare(model)
     model.eval()
     sample_node_num = torch.multinomial(
         torch.Tensor(n_node_pmf), num_samples, replacement=True
     )
+    model = accelerator.prepare(model)
     pred_adj_list = []
     tstart = time.time()
-    for i in range(num_samples):
-        n = sample_node_num[i]
+    for i in range(0, num_samples, config.eval_batch_size):
+        sizes = sample_node_num[i:min(i + config.eval_batch_size, num_samples)]
         edges = sample(
             config=config,
             model=model,
             noise_scheduler=noise_scheduler,
             num_inference_steps=num_timesteps,
-            n=n,
+            sizes=sizes,
             accelerator=accelerator,
         )
-        edges = edges.reshape(max_n_nodes, max_n_nodes)
-        edges = edges[:n, :n]
-        edges = (edges > 0).to(torch.int64)
-        # edges = edges + edges.T
-        edges = edges.to(device='cpu')
-        pred_adj_list.append(edges.numpy())
-        tnow = time.time()
-        print(i, f'{tnow-tstart:.4f} seconds')
+        edges = edges.reshape(len(sizes), max_n_nodes, max_n_nodes)
+        for k, size in enumerate(sizes):
+            edges_k = edges[k, :size, :size]
+            edges_k = (edges_k > 0).to(torch.int64)
+            # edges = edges + edges.T
+            edges_k = edges_k.to(device='cpu')
+            pred_adj_list.append(edges_k.numpy())
+            tnow = time.time()
+            print(i + k, f'{tnow-tstart:.2f} s')
 
     pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
     pred_adj_list = [Lobster(adj) for adj in pred_adj_list]

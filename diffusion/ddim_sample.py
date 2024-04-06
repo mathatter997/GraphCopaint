@@ -51,9 +51,8 @@ def sample(
     accelerator,
     num_inference_steps=1000,
     inference_timesteps=None,
-    n=1,
+    sizes=None,
 ):
-    assert 1 <= n <= config.max_n_nodes
 
     if inference_timesteps is None:
         noise_scheduler.set_timesteps(num_inference_steps)
@@ -63,11 +62,13 @@ def sample(
             accelerator.device
         )
 
+    batch_size = len(sizes)
     sqrt_2 = 2 ** 0.5
-    adj_shape = (1, 1, config.max_n_nodes, config.max_n_nodes)
+    adj_shape = (batch_size, 1, config.max_n_nodes, config.max_n_nodes)
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
-    adj_mask[:, :, n:] = 0
+    for k, size in enumerate(sizes):
+        adj_mask[k, :, size:] = 0
     adj_mask = adj_mask + adj_mask.transpose(-1, -2)
     
     adj_t = torch.randn(adj_shape, device=accelerator.device)
@@ -77,7 +78,8 @@ def sample(
     num_timesteps = len(noise_scheduler.timesteps)
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
-            time = t.to(device=accelerator.device).reshape(-1)
+            # time = t.to(device=accelerator.device).reshape(-1)
+            time = torch.full((batch_size,), t.item(), device=accelerator.device)
             if config.sampler == 'vpsde':
                 edge_noise_res = model(adj_t, time * num_timesteps, mask=adj_mask)
             else:

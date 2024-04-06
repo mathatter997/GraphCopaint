@@ -141,7 +141,6 @@ class PGSN(nn.Module):
         x_degree = self.degree_onehot(x_degree.to(torch.long)).to(torch.float)  # [B, N, max_node]
         x_degree = modules[m_idx](x_degree)  # projection layer [B, N, nf]
         m_idx += 1
-
         # pos encoding
         x_pos = modules[m_idx](x_pos)
         m_idx += 1
