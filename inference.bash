@@ -20,7 +20,7 @@
 #  --scheduler_path models/ENZYMES/scheduler_config.json \
 #  --output_path data/dataset/output_enyzme.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 128 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 80 \
  --sampler ddim --use_copaint True --num_timesteps 1000 \
  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_250000_t1000_psgn.pth \
  --scheduler_path models/Community_small/scheduler_config.json \

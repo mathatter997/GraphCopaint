@@ -86,6 +86,7 @@ def inference(
             adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
             all_batches.append(adj)
             sizes.append(n)
+        assert num_samples <= len(sizes)
         targets = torch.cat(all_batches, dim=0)
         targets = targets.to(device=accelerator.device)
         masks = torch.ones(targets.shape, device=accelerator.device)
@@ -149,7 +150,7 @@ def inference(
     pred_adj_list = []
     tstart = time.time()
     for i in range(0, num_samples, config.eval_batch_size):
-        batch_sz = min(config.eval_batch_size, num_samples - i + 1)
+        batch_sz = min(config.eval_batch_size, num_samples - i)
         if not use_copaint:
             edges = sample(
                 config=config,
@@ -171,7 +172,6 @@ def inference(
                 target_mask=masks[i:i+batch_sz],
                 target_adj=targets[i:i+batch_sz],
             )
-        print(i, batch_sz, edges.shape)
         edges = edges.reshape(batch_sz, max_n_nodes, max_n_nodes)
         for k, size in enumerate(sizes[i:i+batch_sz]):
             edges_k = edges[k, :size, :size]
