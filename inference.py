@@ -97,7 +97,6 @@ def inference(
                 masks[k, :, node, :] = 0
                 masks[k, :, :, node] = 0
         masks = masks + masks.transpose(-1, -2)
-        print((targets * masks)[0])
         masked_targets = (targets * masks).cpu().numpy()[:num_samples]
         pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masked_targets]
         pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
@@ -172,6 +171,7 @@ def inference(
                 target_mask=masks[i:i+batch_sz],
                 target_adj=targets[i:i+batch_sz],
             )
+        print(i, batch_sz, edges.shape)
         edges = edges.reshape(batch_sz, max_n_nodes, max_n_nodes)
         for k, size in enumerate(sizes[i:i+batch_sz]):
             edges_k = edges[k, :size, :size]

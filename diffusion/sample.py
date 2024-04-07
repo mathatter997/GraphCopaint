@@ -170,7 +170,6 @@ def copaint(
         #     timesteps = np.linspace(0, prev_t.item(), interval_num + 1, dtype=int)
         #     noise_scheduler.num_inference_steps = len(timesteps)
         #     noise_scheduler.timesteps = torch.from_numpy(timesteps).to(accelerator.device)
-        print(prev_t)
         for _ in range(repeat_tt):
             # optimize x_t given x_0
             with torch.enable_grad():
