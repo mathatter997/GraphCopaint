@@ -246,7 +246,7 @@ def copaint(
                     noise = torch.randn(adj_t.shape, device=accelerator.device)
                     noise = noise + noise.transpose(-1, -2)
                     noise = noise * adj_mask / sqrt_2
-                    alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype)
+                    alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype, device=accelerator.device)
                     alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t]
                     sqrt_alpha_prod = alpha_prod**0.5
                     sqrt_alpha_prod = sqrt_alpha_prod.flatten()
