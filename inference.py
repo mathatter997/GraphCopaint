@@ -1,22 +1,22 @@
 import os
+import time 
 import torch
 import click
 import networkx as nx
 from accelerate import Accelerator
 from diffusion.pgsn import PGSN
-from diffusers import DDIMScheduler, DDPMScheduler
+from torch_geometric.utils import to_dense_adj
+from diffusers import DDIMScheduler,DDPMScheduler
 from vpsde import ScoreSdeVpScheduler
 from data.dataset import get_dataset
 from data.data_loader import load_data
-from diffusion.ddim_sample import sample
+from diffusion.sample import sample, copaint
 from data.utils import Lobster, prepare_json_dataset
 from diffusion.ema import ExponentialMovingAverage
 from configs.com_small import CommunitySmallConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
-import time 
-
 
 @click.command()
 @click.option(
@@ -29,6 +29,7 @@ import time
 @click.option("--checkpoint_path")
 @click.option("--scheduler_path")
 @click.option("--output_path")
+@click.option("--masked_path", default=None)
 @click.option("--cpu", default=False)
 @click.option("--use_ema", default=True)
 @click.option(
@@ -36,18 +37,23 @@ import time
     default="ddpm",
     type=click.Choice(["ddpm", "ddim", "vpsde"], case_sensitive=False),
 )
+@click.option("--use_copaint", default = False)
 @click.option("--num_samples", default=1000)
 @click.option("--num_timesteps", default=1000)
+@click.option("--unmask_size", default=8)
 def inference(
     config_type,
     checkpoint_path,
     scheduler_path,
     output_path,
+    masked_path,
     cpu,
     use_ema,
     sampler,
+    use_copaint,
     num_samples,
     num_timesteps,
+    unmask_size,
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
@@ -65,12 +71,42 @@ def inference(
         project_dir=os.path.join(config.output_dir, "logs"),
         cpu=cpu,
     )
-    train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
+    targets, _, _, n_node_pmf = get_dataset(
         config.data_filepath, config.data_name, device=accelerator.device
     )
     config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+    if use_copaint:
+        assert sampler == 'ddim'
+        assert masked_path is not None
+        all_batches = []
+        sizes = []
+        for graph in targets:
+            n = graph.num_nodes
+            adj = torch.zeros(1, 1, max_n_nodes, max_n_nodes)
+            adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
+            all_batches.append(adj)
+            sizes.append(n)
+        targets = torch.cat(all_batches, dim=0)
+        targets = targets.to(device=accelerator.device)
+        masks = torch.ones(targets.shape, device=accelerator.device)
+        masks = torch.tril(masks, diagonal=-1)
+        for k, size in enumerate(sizes):
+            masks[k, :, size:] = 0
+            unseen = torch.randperm(max_n_nodes)[:size - unmask_size]
+            for node in unseen:
+                masks[k, :, node, :] = 0
+                masks[k, :, :, node] = 0
+        masks = masks + masks.transpose(-1, -2)
+        print((targets * masks)[0])
+        masked_targets = (targets * masks).cpu().numpy()[:num_samples]
+        pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masked_targets]
+        pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
+        prepare_json_dataset(pred_adj_list, masked_path)
+    else:
+        sizes = torch.multinomial(
+            torch.Tensor(n_node_pmf), num_samples, replacement=True
+        )
     config.sampler = sampler 
-    # https://huggingface.co/papers/2305.08891
     if sampler == "ddim":
         noise_scheduler = DDIMScheduler.from_pretrained(
             scheduler_path,
@@ -85,7 +121,7 @@ def inference(
         )
     elif sampler == "vpsde":
         noise_scheduler = ScoreSdeVpScheduler()
-
+    
     model = PGSN(
         max_node=max_n_nodes,
         nf=config.nf,
@@ -102,7 +138,6 @@ def inference(
         checkpoint_path, map_location=torch.device(accelerator.device)
     )
 
-
     if use_ema:
         ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
         ema.load_state_dict(checkpoint["ema_state_dict"])
@@ -112,31 +147,39 @@ def inference(
         model.load_state_dict(checkpoint["model_state_dict"])
     model = accelerator.prepare(model)
     model.eval()
-    sample_node_num = torch.multinomial(
-        torch.Tensor(n_node_pmf), num_samples, replacement=True
-    )
-    model = accelerator.prepare(model)
     pred_adj_list = []
     tstart = time.time()
     for i in range(0, num_samples, config.eval_batch_size):
-        sizes = sample_node_num[i:min(i + config.eval_batch_size, num_samples)]
-        edges = sample(
-            config=config,
-            model=model,
-            noise_scheduler=noise_scheduler,
-            num_inference_steps=num_timesteps,
-            sizes=sizes,
-            accelerator=accelerator,
-        )
-        edges = edges.reshape(len(sizes), max_n_nodes, max_n_nodes)
-        for k, size in enumerate(sizes):
+        batch_sz = min(config.eval_batch_size, num_samples - i + 1)
+        if not use_copaint:
+            edges = sample(
+                config=config,
+                model=model,
+                noise_scheduler=noise_scheduler,
+                num_inference_steps=num_timesteps,
+                sizes=sizes[i:i+batch_sz],
+                accelerator=accelerator,
+            )
+        else:
+            edges = copaint(
+                config=config,
+                model=model,
+                noise_scheduler=noise_scheduler,
+                num_inference_steps=num_timesteps,
+                sizes=sizes[i:i+batch_sz],
+                accelerator=accelerator,
+                time_travel=True,
+                target_mask=masks[i:i+batch_sz],
+                target_adj=targets[i:i+batch_sz],
+            )
+        edges = edges.reshape(batch_sz, max_n_nodes, max_n_nodes)
+        for k, size in enumerate(sizes[i:i+batch_sz]):
             edges_k = edges[k, :size, :size]
             edges_k = (edges_k > 0).to(torch.int64)
-            # edges = edges + edges.T
             edges_k = edges_k.to(device='cpu')
             pred_adj_list.append(edges_k.numpy())
-            tnow = time.time()
-            print(i + k, f'{tnow-tstart:.2f} s')
+        tnow = time.time()
+        print(i + len(sizes), f'{tnow-tstart:.2f} s')
 
     pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
     pred_adj_list = [Lobster(adj) for adj in pred_adj_list]

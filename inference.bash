@@ -20,11 +20,12 @@
 #  --scheduler_path models/ENZYMES/scheduler_config.json \
 #  --output_path data/dataset/output_enyzme.json
 
-python inference.py --config_type community_small  --cpu True --num_samples 25 \
- --sampler ddpm --num_timesteps 1000 \
- --checkpoint_path models/Community_small/gnn/checkpoint_epoch_80000_t1000_psgn.pth \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 256 \
+ --sampler ddim --use_copaint True --num_timesteps 1000 \
+ --checkpoint_path models/Community_small/gnn/checkpoint_epoch_250000_t1000_psgn.pth \
  --scheduler_path models/Community_small/scheduler_config.json \
- --output_path data/dataset/output_com_small_t25.json
+ --output_path data/dataset/output_com_small_copaint.json \
+ --masked_path data/dataset/masked_com_small_copaint.json
 
 # python inference.py --config_type community_small  --cpu True --num_samples 1000 \
 #  --sampler ddpm --num_timesteps 25 \

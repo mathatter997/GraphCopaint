@@ -6,7 +6,7 @@ class CommunitySmallConfig:
     data_filepath = "data/dataset/"
     data_name = "Community_small"
     train_batch_size = 32
-    eval_batch_size = 2  # how many to sample during evaluation
+    eval_batch_size = 32  # how many to sample during evaluation
     num_epochs = 400000
     start_epoch = 0
     gradient_accumulation_steps = 1
@@ -16,7 +16,6 @@ class CommunitySmallConfig:
     mixed_precision = "no"
     start = 0
     checkpoint_path = None
-
     output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
     label = f"_t{train_timesteps}_psgn"

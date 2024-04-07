@@ -7,11 +7,11 @@ class EgoConfig:
     data_name = "Ego"
     train_batch_size = 32
     eval_batch_size = 2  # how many to sample during evaluation
-    num_epochs = 400000
+    num_epochs = 1000
     start_epoch = 0
     gradient_accumulation_steps = 1
     learning_rate = 2e-5
-    save_model_epochs = 10000
+    save_model_epochs = 50
     train_timesteps = 1000
     mixed_precision = "no"
     start = 0
