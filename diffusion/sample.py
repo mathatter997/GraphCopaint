@@ -165,103 +165,103 @@ def copaint(
 
     T = noise_scheduler.timesteps[0].item()
     time_pairs = list(zip(noise_scheduler.timesteps[:-tau], noise_scheduler.timesteps[tau:]))
-    for prev_t, cur_t in time_pairs:
-        # if interval_num > 1:
-        #     timesteps = np.linspace(0, prev_t.item(), interval_num + 1, dtype=int)
-        #     noise_scheduler.num_inference_steps = len(timesteps)
-        #     noise_scheduler.timesteps = torch.from_numpy(timesteps).to(accelerator.device)
-        for _ in range(repeat_tt):
-            # optimize x_t given x_0
-            with torch.enable_grad():
-                for t_ in range(prev_t.item(), cur_t.item(), -1):
-                    model.eval()
+    # for prev_t, cur_t in time_pairs:
+    #     # if interval_num > 1:
+    #     #     timesteps = np.linspace(0, prev_t.item(), interval_num + 1, dtype=int)
+    #     #     noise_scheduler.num_inference_steps = len(timesteps)
+    #     #     noise_scheduler.timesteps = torch.from_numpy(timesteps).to(accelerator.device)
+    #     for _ in range(repeat_tt):
+    #         # optimize x_t given x_0
+    #         with torch.enable_grad():
+    #             for t_ in range(prev_t.item(), cur_t.item(), -1):
+    #                 model.eval()
 
-                    t = torch.tensor(t_)
-                    adj_t = adj_t * adj_mask
-                    origin_adj = adj_t.clone().detach()
-                    adj_t = adj_t.detach().requires_grad_()
+    #                 t = torch.tensor(t_)
+    #                 adj_t = adj_t * adj_mask
+    #                 origin_adj = adj_t.clone().detach()
+    #                 adj_t = adj_t.detach().requires_grad_()
 
-                    time = torch.full((batch_size,), t.item(), device=accelerator.device)
-                    adj_noise_res = model(adj_t, time, mask=adj_mask)
-                    adj_tm1 = noise_scheduler.step(
-                        adj_noise_res, t, adj_t
-                    ).prev_sample
-                    res = adj_tm1 - adj_t
-                    res = (res + res.transpose(-1, -2)) / sqrt_2
-                    res = res * adj_mask
-                    adj_t = adj_t + res
+    #                 time = torch.full((batch_size,), t.item(), device=accelerator.device)
+    #                 adj_noise_res = model(adj_t, time, mask=adj_mask)
+    #                 adj_tm1 = noise_scheduler.step(
+    #                     adj_noise_res, t, adj_t
+    #                 ).prev_sample
+    #                 res = adj_tm1 - adj_t
+    #                 res = (res + res.transpose(-1, -2)) / sqrt_2
+    #                 res = res * adj_mask
+    #                 adj_t = adj_t + res
 
-                    adj_noise_res = model(adj_t, time, mask=adj_mask)
-                    adj_0 = noise_scheduler.step(
-                        adj_noise_res, t, adj_t
-                    ).pred_original_sample
-                    res = adj_0 - adj_t
-                    res = (res + res.transpose(-1, -2)) / sqrt_2
-                    res = res * adj_mask
-                    adj_0 = adj_t + res
-                    # prev_loss = loss_fn(target_adj, adj_0, target_mask).item()
-                    for step in range(num_iteration_optimize_xt):
-                        loss = loss_fn(
-                            target_adj, adj_0, target_mask
-                        ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
-                        adj_t_grad = torch.autograd.grad(
-                            loss, adj_t, retain_graph=False, create_graph=False
-                        )[0].detach()
-                        adj_t_grad = adj_t_grad * adj_mask
-                        new_adj_t = adj_t - lr_xt * adj_t_grad
-                        # if new_x doesn't improve loss
-                        # we start from x and try again with a smaller grad step
-                        while use_adaptive_lr_xt:
-                            with torch.no_grad():
-                                adj_noise_res = model(new_adj_t, time, mask=adj_mask)
-                                step = noise_scheduler.step(
-                                    adj_noise_res, t, new_adj_t
-                                )
-                                adj_0 = step.pred_original_sample
+    #                 adj_noise_res = model(adj_t, time, mask=adj_mask)
+    #                 adj_0 = noise_scheduler.step(
+    #                     adj_noise_res, t, adj_t
+    #                 ).pred_original_sample
+    #                 res = adj_0 - adj_t
+    #                 res = (res + res.transpose(-1, -2)) / sqrt_2
+    #                 res = res * adj_mask
+    #                 adj_0 = adj_t + res
+    #                 # prev_loss = loss_fn(target_adj, adj_0, target_mask).item()
+    #                 for step in range(num_iteration_optimize_xt):
+    #                     loss = loss_fn(
+    #                         target_adj, adj_0, target_mask
+    #                     ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
+    #                     adj_t_grad = torch.autograd.grad(
+    #                         loss, adj_t, retain_graph=False, create_graph=False
+    #                     )[0].detach()
+    #                     adj_t_grad = adj_t_grad * adj_mask
+    #                     new_adj_t = adj_t - lr_xt * adj_t_grad
+    #                     # if new_x doesn't improve loss
+    #                     # we start from x and try again with a smaller grad step
+    #                     while use_adaptive_lr_xt:
+    #                         with torch.no_grad():
+    #                             adj_noise_res = model(new_adj_t, time, mask=adj_mask)
+    #                             step = noise_scheduler.step(
+    #                                 adj_noise_res, t, new_adj_t
+    #                             )
+    #                             adj_0 = step.pred_original_sample
 
-                                res = adj_0 - new_adj_t
-                                res = (res + res.transpose(-1, -2)) / sqrt_2
-                                res = res * adj_mask
-                                adj_0 = new_adj_t + res
-                                new_loss = loss_fn(
-                                    target_adj, adj_0, target_mask
-                                ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
-                                if not torch.isnan(new_loss) and new_loss <= loss:
-                                    break
-                                else:
-                                    lr_xt *= 0.8
-                                    del new_adj_t, adj_0, new_loss
-                                    new_adj_t = adj_t - lr_xt * adj_t_grad
-                        # optimized x, pred_x0, and e_t
-                        adj_t = new_adj_t.detach().requires_grad_()
-                        del loss, adj_t_grad
-                        if accelerator.device.type == 'cuda':
-                            torch.cuda.empty_cache()
+    #                             res = adj_0 - new_adj_t
+    #                             res = (res + res.transpose(-1, -2)) / sqrt_2
+    #                             res = res * adj_mask
+    #                             adj_0 = new_adj_t + res
+    #                             new_loss = loss_fn(
+    #                                 target_adj, adj_0, target_mask
+    #                             ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
+    #                             if not torch.isnan(new_loss) and new_loss <= loss:
+    #                                 break
+    #                             else:
+    #                                 lr_xt *= 0.8
+    #                                 del new_adj_t, adj_0, new_loss
+    #                                 new_adj_t = adj_t - lr_xt * adj_t_grad
+    #                     # optimized x, pred_x0, and e_t
+    #                     adj_t = new_adj_t.detach().requires_grad_()
+    #                     del loss, adj_t_grad
+    #                     if accelerator.device.type == 'cuda':
+    #                         torch.cuda.empty_cache()
 
-                # time-travel (forward diffusion)
-                if time_travel and t <= T - tau and t % tau == 0:
-                    if optimize_before_time_travel:
-                        pass
-                    noise = torch.randn(adj_t.shape, device=accelerator.device)
-                    noise = noise + noise.transpose(-1, -2)
-                    noise = noise * adj_mask / sqrt_2
-                    alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype, device=accelerator.device)
-                    alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t]
-                    sqrt_alpha_prod = alpha_prod**0.5
-                    sqrt_alpha_prod = sqrt_alpha_prod.flatten()
-                    while len(sqrt_alpha_prod.shape) < len(adj_t.shape):
-                        sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+    #             # time-travel (forward diffusion)
+    #             if time_travel and t <= T - tau and t % tau == 0:
+    #                 if optimize_before_time_travel:
+    #                     pass
+    #                 noise = torch.randn(adj_t.shape, device=accelerator.device)
+    #                 noise = noise + noise.transpose(-1, -2)
+    #                 noise = noise * adj_mask / sqrt_2
+    #                 alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype, device=accelerator.device)
+    #                 alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t]
+    #                 sqrt_alpha_prod = alpha_prod**0.5
+    #                 sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+    #                 while len(sqrt_alpha_prod.shape) < len(adj_t.shape):
+    #                     sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-                    sqrt_one_minus_alpha_prod = (1 - alpha_prod) ** 0.5
-                    sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
-                    while len(sqrt_one_minus_alpha_prod.shape) < len(adj_t.shape):
-                        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+    #                 sqrt_one_minus_alpha_prod = (1 - alpha_prod) ** 0.5
+    #                 sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+    #                 while len(sqrt_one_minus_alpha_prod.shape) < len(adj_t.shape):
+    #                     sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
 
-                    adj_prev = sqrt_alpha_prod * adj_t + sqrt_one_minus_alpha_prod * noise
-                    adj_t = adj_prev * adj_mask
+    #                 adj_prev = sqrt_alpha_prod * adj_t + sqrt_one_minus_alpha_prod * noise
+    #                 adj_t = adj_prev * adj_mask
 
-        lr_xt *= lr_xt_decay
-        coef_xt_reg *= coef_xt_reg_decay
+    #     lr_xt *= lr_xt_decay
+    #     coef_xt_reg *= coef_xt_reg_decay
 
     adj_t = adj_t * adj_mask
     return adj_t

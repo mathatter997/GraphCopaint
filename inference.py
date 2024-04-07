@@ -179,7 +179,7 @@ def inference(
             edges_k = edges_k.to(device='cpu')
             pred_adj_list.append(edges_k.numpy())
         tnow = time.time()
-        print(i + len(sizes), f'{tnow-tstart:.2f} s')
+        print(i + batch_sz, f'{tnow-tstart:.2f} s')
 
     pred_adj_list = [nx.from_numpy_array(adj) for adj in pred_adj_list]
     pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
