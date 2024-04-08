@@ -3,7 +3,7 @@ import torch
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-
+import copy
 
 def get_loss_fn(mode):
     def inpaint_loss(_x0, _pred_x0, _mask):
@@ -42,6 +42,51 @@ def get_edge_index(max_nodes, n=1):
             edge_index.append([i, j])
     edge_index = torch.tensor(edge_index)
     return edge_index.t().contiguous()
+
+def pred_x0(et, xt, t, mask, scheduler, interval_num):
+    sqrt_2 = 2 ** 0.5
+    if interval_num == 1:
+        x0 = scheduler.step(
+                et, t, xt
+            ).pred_original_sample
+        res = x0 - xt
+        res = (res + res.transpose(-1, -2)) / sqrt_2
+        res = res * mask
+        x0 = xt + res
+    else:
+        ts = np.linspace(0, t, interval_num, dtype=int)
+        ts = np.unique(ts)
+        ts = ts[::-1]
+        timepairs = list(zip(ts[:-1], ts[1:]))
+        for prev_t, next_t in timepairs:
+            alpha_prod_t_prev = scheduler.alphas_cumprod[prev_t]
+            alpha_prod_t_next = scheduler.alphas_cumprod[next_t] if next_t >= 0 else scheduler.final_alpha_cumprod
+
+            beta_prod_t = 1 - alpha_prod_t_prev
+            pred_original_sample = (xt - beta_prod_t ** (0.5) * et) / alpha_prod_t_prev ** (0.5)
+            pred_epsilon = et
+
+            # 4. Clip or threshold "predicted x_0"
+            if scheduler.config.thresholding:
+                pred_original_sample = scheduler._threshold_sample(pred_original_sample)
+            elif scheduler.config.clip_sample:
+                pred_original_sample = pred_original_sample.clamp(
+                    -scheduler.config.clip_sample_range, scheduler.config.clip_sample_range
+                )
+            # 5. compute variance: "sigma_t(η)" -> see formula (16)
+            # σ_t = sqrt((1 − α_t−1)/(1 − α_t)) * sqrt(1 − α_t/α_t−1)
+            # variance = scheduler._get_variance(timestep, prev_timestep)
+            # std_dev_t = eta * variance ** (0.5)
+            std_dev_t = 0
+            pred_sample_direction = (1 - alpha_prod_t_next - std_dev_t**2) ** (0.5) * pred_epsilon
+            xnext = alpha_prod_t_next ** (0.5) * pred_original_sample + pred_sample_direction
+            res = xnext - xt
+            res = (res + res.transpose(-1, -2)) / sqrt_2
+            res = res * mask
+            xnext = xt + res
+        x0 = xnext
+    return x0
+
 
 
 def sample(
@@ -113,13 +158,12 @@ def copaint(
     config,
     model,
     noise_scheduler,
+    num_inference_steps,
     accelerator,
-    num_inference_steps=1000,
-    inference_timesteps=None,
-    # interval_num=1,
+    interval_num=1,
     sizes=None,
     # time_travel params
-    time_travel=False,
+    time_travel=True,
     repeat_tt=1,
     tau=5,
     loss_mode="inpaint",
@@ -135,17 +179,11 @@ def copaint(
     target_adj=None,
 ):
     model.eval()
-
-    if inference_timesteps is None:
-        noise_scheduler.set_timesteps(num_inference_steps)
-    else:
-        noise_scheduler.num_inference_steps = len(inference_timesteps)
-        noise_scheduler.timesteps = torch.from_numpy(inference_timesteps).to(
-            accelerator.device
-        )
+    noise_scheduler.set_timesteps(num_inference_steps)
 
     batch_size = len(sizes)
     sqrt_2 = 2 ** 0.5
+
     adj_shape = (batch_size, 1, config.max_n_nodes, config.max_n_nodes)
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
     adj_mask = torch.tril(adj_mask, diagonal=-1)
@@ -162,20 +200,15 @@ def copaint(
 
     loss_fn = get_loss_fn(loss_mode)
     reg_fn = get_reg_fn(reg_mode)
-
+    
     T = noise_scheduler.timesteps[0].item()
     time_pairs = list(zip(noise_scheduler.timesteps[:-tau], noise_scheduler.timesteps[tau:]))
     for prev_t, cur_t in time_pairs:
-        # if interval_num > 1:
-        #     timesteps = np.linspace(0, prev_t.item(), interval_num + 1, dtype=int)
-        #     noise_scheduler.num_inference_steps = len(timesteps)
-        #     noise_scheduler.timesteps = torch.from_numpy(timesteps).to(accelerator.device)
         for _ in range(repeat_tt):
             # optimize x_t given x_0
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
                     model.eval()
-
                     t = torch.tensor(t_)
                     adj_t = adj_t * adj_mask
                     origin_adj = adj_t.clone().detach()
@@ -191,15 +224,15 @@ def copaint(
                     res = res * adj_mask
                     adj_t = adj_t + res
 
-                    adj_noise_res = model(adj_t, time, mask=adj_mask)
-                    adj_0 = noise_scheduler.step(
-                        adj_noise_res, t, adj_t
-                    ).pred_original_sample
-                    res = adj_0 - adj_t
-                    res = (res + res.transpose(-1, -2)) / sqrt_2
-                    res = res * adj_mask
-                    adj_0 = adj_t + res
-                    # prev_loss = loss_fn(target_adj, adj_0, target_mask).item()
+                    adj_noise_res = model(adj_t, time - 1, mask=adj_mask)
+                    adj_0 = pred_x0(et=adj_noise_res,
+                                    xt=adj_t,
+                                    t=t,
+                                    mask=adj_mask,
+                                    scheduler=noise_scheduler,
+                                    interval_num=interval_num,
+                                    )
+                    
                     for step in range(num_iteration_optimize_xt):
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
@@ -213,16 +246,15 @@ def copaint(
                         # we start from x and try again with a smaller grad step
                         while use_adaptive_lr_xt:
                             with torch.no_grad():
-                                adj_noise_res = model(new_adj_t, time, mask=adj_mask)
-                                step = noise_scheduler.step(
-                                    adj_noise_res, t, new_adj_t
-                                )
-                                adj_0 = step.pred_original_sample
-
-                                res = adj_0 - new_adj_t
-                                res = (res + res.transpose(-1, -2)) / sqrt_2
-                                res = res * adj_mask
-                                adj_0 = new_adj_t + res
+                                adj_noise_res = model(new_adj_t, time - 1, mask=adj_mask)
+                                adj_0 = pred_x0(et=adj_noise_res,
+                                                xt=new_adj_t,
+                                                t=t,
+                                                mask=adj_mask,
+                                                scheduler=noise_scheduler,
+                                                interval_num=interval_num,
+                                        )
+                                
                                 new_loss = loss_fn(
                                     target_adj, adj_0, target_mask
                                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
