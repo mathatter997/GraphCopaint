@@ -38,6 +38,7 @@ from configs.enzyme import EnzymeConfig
     default="ddpm",
     type=click.Choice(["ddpm", "ddim", "vpsde"], case_sensitive=False),
 )
+@click.option("--log_x0_predictions", default=False)
 @click.option("--num_samples", default=1000)
 @click.option("--num_timesteps", default=1000)
 @click.option("--use_copaint", default = False)
@@ -66,6 +67,7 @@ def inference(
     time_travel,
     repeat_tt,
     tau,
+    log_x0_predictions,
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
@@ -180,6 +182,7 @@ def inference(
                 num_inference_steps=num_timesteps,
                 sizes=sizes[i:i+batch_sz],
                 accelerator=accelerator,
+                log_x0_predictions=log_x0_predictions,
             )
         else:
             edges = copaint(
@@ -196,6 +199,7 @@ def inference(
                 repeat_tt=repeat_tt,
                 time_travel=time_travel,
                 tau=tau,
+                log_x0_predictions=log_x0_predictions,
             )
         edges = edges.reshape(batch_sz, max_n_nodes, max_n_nodes)
         for k, size in enumerate(sizes[i:i+batch_sz]):

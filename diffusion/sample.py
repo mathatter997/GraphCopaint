@@ -97,6 +97,7 @@ def sample(
     num_inference_steps=1000,
     inference_timesteps=None,
     sizes=None,
+    log_x0_predictions=False,
 ):
 
     if inference_timesteps is None:
@@ -121,6 +122,7 @@ def sample(
     adj_t = (adj_t + adj_t.transpose(-1, -2)) / sqrt_2
     adj_t = adj_t * adj_mask
     num_timesteps = len(noise_scheduler.timesteps)
+    adj_0s = []
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
             # time = t.to(device=accelerator.device).reshape(-1)
@@ -139,6 +141,16 @@ def sample(
         res = (res + res.transpose(-1, -2)) / sqrt_2
         res = res * adj_mask
         adj_t = adj_t + res
+        if log_x0_predictions:
+            adj_0 = pred_x0(et=edge_noise_res,
+                            xt=adj_t,
+                            t=t,
+                            mask=adj_mask,
+                            scheduler=noise_scheduler,
+                            interval_num=1,
+                            )
+            # print(adj_t)
+            adj_0s.append(adj_0)
         # adj_t = torch.clip(adj_t, -3, 3)
         # adj_t = torch.clip(adj_t, -3, 3)
         # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
@@ -151,6 +163,15 @@ def sample(
         #     edges,weights = zip(*nx.get_edge_attributes(graph,'weight').items())
         #     nx.draw(graph, pos, node_color='b', edgelist=edges, edge_color=weights, width=1.0, edge_cmap=plt.cm.Blues)
         #     plt.savefig('edges/edges_{}.png'.format(t))
+    if log_x0_predictions:
+        sz = torch.numel(adj_t)
+        for i in range(len(adj_0s)):
+            adj_0s[i] = torch.sum((adj_0s[i] - adj_t) ** 2).cpu().numpy() / sz
+        adj_0s = np.array(adj_0s)
+        time = noise_scheduler.timesteps.cpu().numpy()
+        plt.plot(time, adj_0s)
+        plt.yscale('log')
+        plt.savefig(fname=f'data/dataset/{config.data_name}_maskloss_{config.sampler}.pdf')
     return adj_t
 
 
@@ -177,6 +198,7 @@ def copaint(
     num_iteration_optimize_xt=2,
     target_mask=None,
     target_adj=None,
+    log_x0_predictions=False,
 ):
     model.eval()
     noise_scheduler.set_timesteps(num_inference_steps)
@@ -202,9 +224,12 @@ def copaint(
     reg_fn = get_reg_fn(reg_mode)
     
     T = noise_scheduler.timesteps[0].item()
-    time_pairs = list(zip(noise_scheduler.timesteps[:-tau], noise_scheduler.timesteps[tau:]))
+    time_pairs = list(zip(noise_scheduler.timesteps[::tau], noise_scheduler.timesteps[tau::tau]))
+    end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
+    time_pairs.append(end)
+    adj_0s = []
     for prev_t, cur_t in time_pairs:
-        for _ in range(repeat_tt):
+        for repeat_step in range(repeat_tt):
             # optimize x_t given x_0
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
@@ -232,7 +257,6 @@ def copaint(
                                     scheduler=noise_scheduler,
                                     interval_num=interval_num,
                                     )
-                    
                     for step in range(num_iteration_optimize_xt):
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
@@ -270,15 +294,18 @@ def copaint(
                         if accelerator.device.type == 'cuda':
                             torch.cuda.empty_cache()
 
+                    if log_x0_predictions and repeat_step == repeat_tt - 1:
+                        adj_0s.append(adj_0)
+
                 # time-travel (forward diffusion)
-                if time_travel and t <= T - tau and t % tau == 0:
+                if time_travel and t <= T - tau and t_ % tau == 0:
                     if optimize_before_time_travel:
                         pass
                     noise = torch.randn(adj_t.shape, device=accelerator.device)
                     noise = noise + noise.transpose(-1, -2)
                     noise = noise * adj_mask / sqrt_2
                     alphas_cumprod = noise_scheduler.alphas_cumprod.to(dtype=adj_t.dtype, device=accelerator.device)
-                    alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t]
+                    alpha_prod = alphas_cumprod[prev_t] / alphas_cumprod[cur_t + 1]
                     sqrt_alpha_prod = alpha_prod**0.5
                     sqrt_alpha_prod = sqrt_alpha_prod.flatten()
                     while len(sqrt_alpha_prod.shape) < len(adj_t.shape):
@@ -296,4 +323,13 @@ def copaint(
         coef_xt_reg *= coef_xt_reg_decay
 
     adj_t = adj_t * adj_mask
+    if log_x0_predictions:
+        sz = torch.numel(adj_t)
+        for i in range(len(adj_0s)):
+            adj_0s[i] = torch.sum((adj_0s[i] * adj_mask - target_adj * adj_mask) ** 2).cpu().detach().numpy() / sz
+        adj_0s = np.array(adj_0s)
+        time = noise_scheduler.timesteps.cpu().numpy()
+        plt.plot(time, adj_0s)
+        plt.yscale('log')
+        plt.savefig(fname=f'data/dataset/{config.data_name}_maskloss_copaint.pdf')
     return adj_t

@@ -10,10 +10,10 @@
 #  --scheduler_path models/Ego_small/scheduler_config.json \
 #  --output_path data/dataset/output_ego_small.json
 
-#  CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego  --cpu False --num_samples 1000 \
-#  --checkpoint_path models/Ego/gnn/checkpoint_epoch_1000_t1000_psgn.pth \
-#  --scheduler_path models/Ego/scheduler_config.json \
-#  --output_path data/dataset/output_ego.json
+ CUDA_VISIBLE_DEVICES="2" python inference.py --config_type ego  --cpu False --num_samples 1000 \
+ --checkpoint_path models/Ego/gnn/checkpoint_epoch_900_t1000_psgn.pth \
+ --scheduler_path models/Ego/scheduler_config.json \
+ --output_path data/dataset/output_ego.json
  
 #  CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
 #  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
@@ -22,21 +22,28 @@
 
 # CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1 \
 #  --sampler ddim --use_copaint True --num_timesteps 1000 \
-#  --num_intervals 1 --optimization_steps 2 --tau 5 \
-#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_250000_t1000_psgn.pth \
+#  --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
+#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
+#  --scheduler_path models/Community_small/scheduler_config.json \
+#  --output_path data/dataset/output_com_small_copaint_s1.json \
+#  --mask_path data/dataset/mask_com_small_copaint_s1.json \
+#  --masked_output_path data/dataset/masked_com_small_copaint_s1.json \
+#  --log_x0_predictions True
+
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 1000 \
+#  --sampler ddim --use_copaint True --num_timesteps 1000 \
+#  --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel False \
+#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
 #  --scheduler_path models/Community_small/scheduler_config.json \
 #  --output_path data/dataset/output_com_small_copaint.json \
 #  --mask_path data/dataset/mask_com_small_copaint.json \
 #  --masked_output_path data/dataset/masked_com_small_copaint.json 
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 1000 \
- --sampler ddim --use_copaint True --num_timesteps 1000 \
- --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel False \
- --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
- --scheduler_path models/Community_small/scheduler_config.json \
- --output_path data/dataset/output_com_small_copaint.json \
- --mask_path data/dataset/mask_com_small_copaint.json \
- --masked_output_path data/dataset/masked_com_small_copaint.json 
+# python inference.py --config_type community_small  --cpu True --num_samples 1 \
+#  --sampler ddim --num_timesteps 1000 --log_x0_predictions True \
+#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
+#  --scheduler_path models/Community_small/scheduler_config.json \
+#  --output_path data/dataset/output_com_small_s1.json
 
 # python inference.py --config_type community_small  --cpu True --num_samples 1000 \
 #  --sampler ddpm --num_timesteps 25 \
