@@ -267,7 +267,7 @@ def copaint(
                 .detach()
                 .numpy()
                 / sz
-            ) / batch_size
+            )
         target_loss = np.array(target_loss)
         time = noise_scheduler.timesteps.cpu().numpy()
         wandb.init(
