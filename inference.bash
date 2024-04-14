@@ -10,19 +10,20 @@
 #  --scheduler_path models/Ego_small/scheduler_config.json \
 #  --output_path data/dataset/output_ego_small.json
 
- CUDA_VISIBLE_DEVICES="2" python inference.py --config_type ego  --cpu False --num_samples 1000 \
- --checkpoint_path models/Ego/gnn/checkpoint_epoch_900_t1000_psgn.pth \
- --scheduler_path models/Ego/scheduler_config.json \
- --output_path data/dataset/output_ego.json
+#  CUDA_VISIBLE_DEVICES="2" python inference.py --config_type ego  --cpu False --num_samples 1000 \
+#  --checkpoint_path models/Ego/gnn/checkpoint_epoch_900_t1000_psgn.pth \
+#  --scheduler_path models/Ego/scheduler_config.json \
+#  --output_path data/dataset/output_ego.json
  
 #  CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
 #  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
 #  --scheduler_path models/ENZYMES/scheduler_config.json \
 #  --output_path data/dataset/output_enyzme.json
 
-# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1 \
-#  --sampler ddim --use_copaint True --num_timesteps 1000 \
-#  --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 10 \
+#  --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
+#  --loss_mode naive_inpaint --reg_mode naive_square \
+#  --num_intervals 1 --optimization_steps 3 --tau 5 --time_travel True \
 #  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
 #  --scheduler_path models/Community_small/scheduler_config.json \
 #  --output_path data/dataset/output_com_small_copaint_s1.json \
