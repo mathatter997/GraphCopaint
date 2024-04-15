@@ -64,7 +64,6 @@ def train_loop(
             else:
                 adj, adj_mask = batch
                 adj = scale_data(adj) * adj_mask
-                print(adj)
             edge_noise = torch.randn(adj.shape, device=accelerator.device)
             # make symmetric 
             edge_noise = edge_noise + edge_noise.transpose(-1, -2)
