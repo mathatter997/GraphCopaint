@@ -5,7 +5,7 @@ import click
 
 from dataclasses import dataclass
 from accelerate import Accelerator
-from diffusers import DDPMScheduler
+from diffusers import DDPMScheduler, UNet2DModel
 from diffusion.ddpm import train_loop
 from data.data_loader import load_data
 from torch_geometric.loader import DataLoader
@@ -73,18 +73,25 @@ def train_ddpm(
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         )
-    model = PGSN(
-        max_node=max_n_nodes,
-        nf=config.nf,
-        num_gnn_layers=config.num_gnn_layers,
-        embedding_type=config.embedding_type,
-        rw_depth=config.rw_depth,
-        graph_layer=config.graph_layer,
-        edge_th=config.edge_th,
-        heads=config.heads,
-        dropout=config.dropout,
-        attn_clamp=config.attn_clamp
-    )
+    if config_type != 'community_small_smooth':
+        model = PGSN(
+            max_node=max_n_nodes,
+            nf=config.nf,
+            num_gnn_layers=config.num_gnn_layers,
+            embedding_type=config.embedding_type,
+            rw_depth=config.rw_depth,
+            graph_layer=config.graph_layer,
+            edge_th=config.edge_th,
+            heads=config.heads,
+            dropout=config.dropout,
+            attn_clamp=config.attn_clamp
+        )
+    else:
+        model = UNet2DModel(
+            sample_size=(max_n_nodes, max_n_nodes),
+            in_channels=1,
+            out_channels=1,
+        )
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     lr_scheduler = get_constant_schedule(
         optimizer=optimizer,

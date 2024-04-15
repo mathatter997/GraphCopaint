@@ -6,7 +6,7 @@ import networkx as nx
 from accelerate import Accelerator
 from diffusion.pgsn import PGSN
 from torch_geometric.utils import to_dense_adj
-from diffusers import DDIMScheduler,DDPMScheduler
+from diffusers import DDIMScheduler,DDPMScheduler,UNet2DModel
 from vpsde import ScoreSdeVpScheduler
 from data.dataset import get_dataset
 from diffusion.sample import sample, copaint, repaint
@@ -22,7 +22,11 @@ from configs.enzyme import EnzymeConfig
     "--config_type",
     default="community_small",
     type=click.Choice(
-        ["community_small", "ego_small", "ego", "enzyme"], case_sensitive=False
+        ["community_small",
+         "community_small_smooth",
+        "ego_small", 
+        "ego", 
+        "enzyme"], case_sensitive=False
     ),
 )
 @click.option("--checkpoint_path")
@@ -160,19 +164,25 @@ def inference(
         )
     elif sampler == "vpsde":
         noise_scheduler = ScoreSdeVpScheduler()
-    
-    model = PGSN(
-        max_node=max_n_nodes,
-        nf=config.nf,
-        num_gnn_layers=config.num_gnn_layers,
-        embedding_type=config.embedding_type,
-        rw_depth=config.rw_depth,
-        graph_layer=config.graph_layer,
-        edge_th=config.edge_th,
-        heads=config.heads,
-        dropout=config.dropout,
-        attn_clamp=config.attn_clamp,
-    )
+    if config_type != 'community_small_smooth':
+        model = PGSN(
+            max_node=max_n_nodes,
+            nf=config.nf,
+            num_gnn_layers=config.num_gnn_layers,
+            embedding_type=config.embedding_type,
+            rw_depth=config.rw_depth,
+            graph_layer=config.graph_layer,
+            edge_th=config.edge_th,
+            heads=config.heads,
+            dropout=config.dropout,
+            attn_clamp=config.attn_clamp,
+        )
+    else:
+        model = UNet2DModel(
+            sample_size=(max_n_nodes, max_n_nodes),
+            in_channels=1,
+            out_channels=1,
+        )
     checkpoint = torch.load(
         checkpoint_path, map_location=torch.device(accelerator.device)
     )

@@ -82,7 +82,10 @@ def train_loop(
             noisy_edges = noisy_edges * adj_mask
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                noise_edge_pred = model(noisy_edges, timesteps, mask=adj_mask)
+                if config.data_name != 'Community_small_smooth':
+                    noise_edge_pred = model(noisy_edges, timesteps, mask=adj_mask)
+                else:
+                    noise_edge_pred = model(noisy_edges, timesteps).sample * adj_mask
                 loss = F.mse_loss(noise_edge_pred, edge_noise)
 
                 accelerator.backward(loss)
