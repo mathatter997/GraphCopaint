@@ -16,7 +16,7 @@ from diffusers.optimization import (
     get_cosine_schedule_with_warmup,
     get_constant_schedule,
 )
-from configs.com_small import CommunitySmallConfig
+from configs.com_small import CommunitySmallConfig, CommunitySmallSmoothConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
@@ -27,6 +27,7 @@ from configs.enzyme import EnzymeConfig
 @click.option("--config_type",
               default='community_small',
               type=click.Choice(['community_small',
+                                 'community_small_smooth',
                                  'ego_small',
                                  'ego',
                                  'enzyme'], case_sensitive=False),
@@ -37,6 +38,8 @@ def train_ddpm(
 ):
     if config_type == 'community_small':
         config = CommunitySmallConfig()
+    elif config_type == 'community_small_smooth':
+        config = CommunitySmallSmoothConfig()
     elif config_type == 'ego_small':
         config = EgoSmallConfig()
     elif config_type == 'ego':
@@ -52,14 +55,24 @@ def train_ddpm(
         project_dir=os.path.join(config.output_dir, "logs"),
         cpu=cpu,
     )
-
-    train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
-        config.data_filepath, config.data_name, device=accelerator.device
-    )
-    config.max_n_nodes = max_n_nodes = len(n_node_pmf)
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=config.train_batch_size, shuffle=True
-    ) 
+    split = 0.8
+    if config_type != 'community_small_smooth':
+        train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
+            config.data_filepath, config.data_name, device=accelerator.device, split=split
+        )
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=config.train_batch_size, shuffle=True
+        ) 
+    else:
+        split = 0.8
+        dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
+        num_train = int(len(dataset) * split)
+        train_dataset = dataset[:num_train]
+        config.max_n_nodes = max_n_nodes = train_dataset[0][0].shape[-1]
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=config.train_batch_size, shuffle=True
+        )
     model = PGSN(
         max_node=max_n_nodes,
         nf=config.nf,

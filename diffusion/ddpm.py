@@ -48,7 +48,9 @@ def train_loop(
     global_step = 0
 
     # [0,1] -> [-1, 1]
-    scale_data = lambda x: 2.0 * x - 1
+    def scale_data(x):
+        return 2.0 * x - 1
+    
     sqrt_2 = 2 ** 0.5
     for epoch in range(config.start_epoch, config.num_epochs):
         progress_bar = tqdm(
@@ -57,7 +59,12 @@ def train_loop(
         progress_bar.set_description(f"Epoch {epoch}")
 
         for step, batch in enumerate(train_dataloader):
-            adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
+            if config.data_name != 'Community_small_smooth':
+                adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
+            else:
+                adj, adj_mask = batch
+                adj = scale_data(adj) * adj_mask
+                print(adj)
             edge_noise = torch.randn(adj.shape, device=accelerator.device)
             # make symmetric 
             edge_noise = edge_noise + edge_noise.transpose(-1, -2)
