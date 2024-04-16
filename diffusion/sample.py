@@ -210,7 +210,6 @@ def copaint(
                             torch.cuda.empty_cache()
 
                     print(t_)
-                    quit()
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
                         adj_noise_res = model(
                                     adj_t, time, mask=adj_mask
