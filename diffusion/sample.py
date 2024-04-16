@@ -221,7 +221,6 @@ def copaint(
                                     target_adj, adj_0, target_mask
                                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
                                 if not torch.isnan(new_loss) and new_loss <= loss:
-                                    print(f'{torch.norm(adj_0_ - adj_0).item():.4f}', f'{(loss - new_loss).item():.4f}', f'{loss.item():.4f}', lr_xt_temp, lr_xt, t_)
                                     break
                                 else:
                                     lr_xt_temp *= 0.8
