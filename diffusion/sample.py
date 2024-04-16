@@ -146,7 +146,28 @@ def copaint(
     )
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
-    adj_0s = []
+    
+    if log_x0_predictions:
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="Copaint Ablation",
+            # track hyperparameters and run metadata
+            config={
+                "inpainter": 'copaint',
+                "batch_size": batch_size,
+                "dataset": config.data_name,
+                "time_travel": time_travel,
+                "interval_num": interval_num,
+                "tau": tau,
+                "repeat_tt": repeat_tt,
+                "loss_mode": loss_mode,
+                "reg_mode": reg_mode,
+                "lr_xt": init_lr,
+                "lr_xt_decay": lr_xt_decay,
+                "coef_xt_reg": coef_xt_reg,
+                "coef_xt_reg_decay": coef_xt_reg_decay,
+            },
+        )
     for prev_t, cur_t in time_pairs:
         for repeat_step in range(repeat_tt):
             # optimize x_t given x_0
@@ -209,7 +230,6 @@ def copaint(
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 
-                    print(t_)
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
                         adj_noise_res = model(
                                     adj_t, time, mask=adj_mask
@@ -222,7 +242,15 @@ def copaint(
                                     scheduler=noise_scheduler,
                                     interval_num=interval_num,
                                 )
-                        adj_0s.append(adj_0.cpu())
+                        sz = torch.numel(adj_t)
+                        target_loss = (
+                            torch.sum((adj_0 * target_mask - target_adj * target_mask) ** 2)
+                            .cpu()
+                            .detach()
+                            .numpy()
+                            / sz
+                        )
+                        wandb.log({"time_step": t_, "target_loss": target_loss.item()})
                         del adj_noise_res, adj_0
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
@@ -266,54 +294,6 @@ def copaint(
         coef_xt_reg *= coef_xt_reg_decay
 
     adj_t = adj_t * adj_mask
-    if log_x0_predictions:
-        sz = torch.numel(adj_t)
-        target_loss = [0 for _ in range(len(adj_0s))]
-        for i in range(len(adj_0s)):
-            target_loss[i] = (
-                torch.sum((adj_0s[i] * target_mask - target_adj * target_mask) ** 2)
-                .cpu()
-                .detach()
-                .numpy()
-                / sz
-            )
-        target_loss = np.array(target_loss)
-        time = noise_scheduler.timesteps.cpu().numpy()
-        wandb.init(
-            # set the wandb project where this run will be logged
-            project="Copaint Ablation",
-            # track hyperparameters and run metadata
-            config={
-                "batch_size": batch_size,
-                "dataset": config.data_name,
-                "time_travel": time_travel,
-                "interval_num": interval_num,
-                "tau": tau,
-                "repeat_tt": repeat_tt,
-                "loss_mode": loss_mode,
-                "reg_mode": reg_mode,
-                "lr_xt": init_lr,
-                "lr_xt_decay": lr_xt_decay,
-                "coef_xt_reg": coef_xt_reg,
-                "coef_xt_reg_decay": coef_xt_reg_decay,
-            },
-        )
-        for step, loss in zip(time, target_loss):
-            wandb.log({"time_step": step, "target_loss": loss})
-        # plt.plot(time, adj_0s)
-        # plt.savefig(
-        #     fname=f"data/dataset/{config.data_name}_maskloss_copaint_bs_{batch_size}" +
-        #           f"_time_travel_{time_travel}" + 
-        #           f"_interval_num_{interval_num}" +
-        #           f"_tau_{tau}" +
-        #           f"_repeat_tt_{repeat_tt}" +
-        #           f"_loss_mode_{loss_mode}" +
-        #           f"_reg_mode_{reg_mode}" +
-        #           f"_lr_xt_{init_lr}" + 
-        #           f"_lr_xt_decay_{lr_xt_decay}" + 
-        #           f"_coef_xt_reg_{coef_xt_reg}" + 
-        #           f"_coef_xt_reg_decay_{coef_xt_reg_decay}.pdf"
-        # )
     return adj_t
 
 
@@ -357,7 +337,21 @@ def repaint(
     )
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
-    adj_0s = []
+
+    if log_x0_predictions:
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="Copaint Ablation",
+            # track hyperparameters and run metadata
+            config={
+                "inpainter": 'repaint',
+                "batch_size": batch_size,
+                "dataset": config.data_name,
+                "time_travel": time_travel,
+                "tau": tau,
+                "repeat_tt": repeat_tt,
+            },
+        )
     for prev_t, cur_t in time_pairs:
         for repeat_step in range(repeat_tt):
             # optimize x_t given x_0
@@ -402,7 +396,18 @@ def repaint(
                             scheduler=noise_scheduler,
                             interval_num=1,
                         )
-                        adj_0s.append(adj_0)
+                        sz = torch.numel(adj_t)
+                        target_loss = (
+                            torch.sum((adj_0 * target_mask - target_adj * target_mask) ** 2)
+                            .cpu()
+                            .detach()
+                            .numpy()
+                            / sz
+                        )
+                        wandb.log({"time_step": t_, "target_loss": target_loss.item()})
+                        del adj_0
+                        if accelerator.device.type == "cuda":
+                            torch.cuda.empty_cache()
 
                 # time-travel (forward diffusion)
                 if time_travel and (cur_t + 1) <= T - tau:
@@ -431,20 +436,4 @@ def repaint(
                     adj_t = adj_prev * adj_mask
 
     adj_t = adj_t * adj_mask
-    if log_x0_predictions:
-        sz = torch.numel(adj_t)
-        for i in range(len(adj_0s)):
-            adj_0s[i] = (
-                torch.sum((adj_0s[i] * adj_mask - target_adj * adj_mask) ** 2)
-                .cpu()
-                .detach()
-                .numpy()
-                / sz
-            ) / batch_size
-        adj_0s = np.array(adj_0s)
-        time = noise_scheduler.timesteps.cpu().numpy()
-        plt.plot(time, adj_0s)
-        plt.savefig(
-            fname=f"data/dataset/{config.data_name}_maskloss_repaint_bs_{batch_size}.pdf"
-        )
     return adj_t
