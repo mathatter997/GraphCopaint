@@ -63,3 +63,18 @@
 #  --checkpoint_path models/Ego/gnn/checkpoint_epoch_1000_t1000_psgn.pth \
 #  --scheduler_path models/Ego/scheduler_config.json \
 #  --output_path data/dataset/output_ego_ddim_t25.json
+
+
+loss_mode="naive_inpaint"
+reg_mode="naive_square"
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1 \
+    --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
+    --loss_mode $loss_mode --reg_mode $reg_mode \
+    --lr_xt_decay 1.05 --use_adaptive_lr_xt True \
+    --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
+    --checkpoint_path models/Community_small/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
+    --scheduler_path models/Community_small/scheduler_config.json \
+    --output_path data/dataset/ablation/output_com_small_copaint_a6_0.json \
+    --mask_path data/dataset/ablation/mask_com_small_copaint_a6_0.json \
+    --masked_output_path data/dataset/ablation/masked_com_small_copaint_a6_0.json \
+    --log_x0_predictions False

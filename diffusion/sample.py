@@ -191,6 +191,7 @@ def copaint(
                             scheduler=noise_scheduler,
                             interval_num=interval_num,
                         )
+                        adj_0_ = adj_0
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
                         ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
@@ -202,6 +203,7 @@ def copaint(
                         new_adj_t = adj_t - lr_xt * adj_t_grad
                         # if new_x doesn't improve loss
                         # we start from x and try again with a smaller grad step
+                        lr_xt_temp = lr_xt
                         while use_adaptive_lr_xt:
                             with torch.no_grad():
                                 adj_noise_res = model(
@@ -219,11 +221,12 @@ def copaint(
                                     target_adj, adj_0, target_mask
                                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
                                 if not torch.isnan(new_loss) and new_loss <= loss:
+                                    print(f'{torch.norm(adj_0_ - adj_0).item():.4f}', f'{(loss - new_loss).item():.4f}', f'{loss.item():.4f}', lr_xt_temp, lr_xt, t_)
                                     break
                                 else:
-                                    lr_xt *= 0.8
+                                    lr_xt_temp *= 0.8
                                     del new_adj_t, adj_0, new_loss
-                                    new_adj_t = adj_t - lr_xt * adj_t_grad
+                                    new_adj_t = adj_t - lr_xt_temp * adj_t_grad
                         # optimized x, pred_x0, and e_t
                         adj_t = new_adj_t.detach().requires_grad_()
                         del loss, adj_t_grad, adj_0, adj_noise_res
