@@ -87,7 +87,7 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cp
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 32 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --lr_xt_decay 1.02 --use_adaptive_lr_xt False \
