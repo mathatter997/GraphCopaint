@@ -67,10 +67,10 @@
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 32 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
-    --lr_xt_decay 1.05 --use_adaptive_lr_xt True \
+    --lr_xt_decay 1.0 --use_adaptive_lr_xt True \
     --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
     --checkpoint_path models/Community_small/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
     --scheduler_path models/Community_small/scheduler_config.json \

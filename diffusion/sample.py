@@ -121,6 +121,7 @@ def copaint(
     noise_scheduler.set_timesteps(num_inference_steps)
 
     batch_size = len(sizes)
+    loss_norm = batch_size
     sqrt_2 = 2**0.5
     init_lr = lr_xt
 
@@ -191,16 +192,17 @@ def copaint(
                             scheduler=noise_scheduler,
                             interval_num=interval_num,
                         )
-                        adj_0_ = adj_0
+                        # adj_0_ = adj_0
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
                         ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
+                        loss = loss / loss_norm
                         adj_t_grad = torch.autograd.grad(
                             loss, adj_t, retain_graph=False, create_graph=False
                         )[0].detach()
                         adj_t_grad = (adj_t_grad + adj_t_grad.transpose(-1, -2)) / 2
                         adj_t_grad = adj_t_grad * adj_mask
-                        new_adj_t = adj_t - lr_xt * adj_t_grad
+                        new_adj_t = adj_t - lr_xt * adj_t_grad * loss_norm
                         # if new_x doesn't improve loss
                         # we start from x and try again with a smaller grad step
                         lr_xt_temp = lr_xt
@@ -220,12 +222,14 @@ def copaint(
                                 new_loss = loss_fn(
                                     target_adj, adj_0, target_mask
                                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
+                                new_loss = new_loss / loss_norm
                                 if not torch.isnan(new_loss) and new_loss <= loss:
+                                    # print(f'{torch.norm(adj_0_ - adj_0).item():.4f}', f'{(loss - new_loss).item():.4f}', f'{loss.item():.4f}', lr_xt_temp, lr_xt,t_)
                                     break
                                 else:
                                     lr_xt_temp *= 0.8
                                     del new_adj_t, adj_0, new_loss
-                                    new_adj_t = adj_t - lr_xt_temp * adj_t_grad
+                                    new_adj_t = adj_t - lr_xt_temp * adj_t_grad * loss_norm
                         # optimized x, pred_x0, and e_t
                         adj_t = new_adj_t.detach().requires_grad_()
                         del loss, adj_t_grad, adj_0, adj_noise_res
