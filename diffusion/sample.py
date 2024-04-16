@@ -205,7 +205,7 @@ def copaint(
                                     new_adj_t = adj_t - lr_xt * adj_t_grad
                         # optimized x, pred_x0, and e_t
                         adj_t = new_adj_t.detach().requires_grad_()
-                        del loss, adj_t_grad
+                        del loss, adj_t_grad, adj_0, adj_noise_res
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 
@@ -221,6 +221,7 @@ def copaint(
                                     scheduler=noise_scheduler,
                                     interval_num=interval_num,
                                 )
+                        del adj_noise_res
                         adj_0s.append(adj_0)
 
                     adj_noise_res = model(adj_t, time, mask=adj_mask)
