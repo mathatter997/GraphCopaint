@@ -221,8 +221,10 @@ def copaint(
                                     scheduler=noise_scheduler,
                                     interval_num=interval_num,
                                 )
-                        del adj_noise_res
-                        adj_0s.append(adj_0)
+                        adj_0s.append(adj_0.cpu())
+                        del adj_noise_res, adj_0
+                        if accelerator.device.type == "cuda":
+                            torch.cuda.empty_cache()
 
                     adj_noise_res = model(adj_t, time, mask=adj_mask)
                     adj_tm1 = noise_scheduler.step(adj_noise_res, t, adj_t).prev_sample
