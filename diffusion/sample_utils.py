@@ -27,20 +27,10 @@ def get_loss_fn(mode):
         U = U.to(dtype=_pred_x0.dtype).reshape(b_sz, n, n)
         _, q = torch.sort(Lpred)
 
-        # T.reshape(n, n)
-        # S = S.reshape(n, n)
-        # M = S[q][:,q]
-        # M = M[p_inv][:,p_inv]
+
         loss = 0
         for i in range(b_sz):
             loss += torch.sum((L0[i, p[i]] - Lpred[i, q[i]]) ** 2)
-        # A = Lpred[q][p_inv]
-        # A = torch.diag(A)
-        
-        # print(loss.item(), torch.norm(T - M).item(), torch.norm(T - S).item())
-        # print(torch.norm(V[p] - U[q]).item())
-        # print(L0[p])
-        # print(Lpred[q])
         return loss
 
     def none(**args):

@@ -157,30 +157,19 @@ def copaint(
                     adj_t = adj_t * adj_mask
                     origin_adj = adj_t.clone().detach()
                     adj_t = adj_t.detach().requires_grad_()
-
                     time = torch.full(
                         (batch_size,), t.item(), device=accelerator.device
                     )
-                    adj_noise_res = model(adj_t, time, mask=adj_mask)
-                    adj_tm1 = noise_scheduler.step(adj_noise_res, t, adj_t).prev_sample
-                    res = adj_tm1 - adj_t
-                    res = (res + res.transpose(-1, -2)) / sqrt_2
-                    res = res * adj_mask
-                    adj_t = adj_t + res
-                    adj_noise_res = model(adj_t, time - 1, mask=adj_mask)
-                    adj_0 = pred_x0(
-                        et=adj_noise_res,
-                        xt=adj_t,
-                        t=t,
-                        mask=adj_mask,
-                        scheduler=noise_scheduler,
-                        interval_num=interval_num,
-                    )
-                    # loss = loss_fn(
-                    #     target_adj, adj_0, target_mask
-                    # ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
-                    # print(loss.item() / batch_size, t_)
                     for step in range(num_iteration_optimize_xt):
+                        adj_noise_res = model(adj_t, time, mask=adj_mask)
+                        adj_0 = pred_x0(
+                            et=adj_noise_res,
+                            xt=adj_t,
+                            t=t,
+                            mask=adj_mask,
+                            scheduler=noise_scheduler,
+                            interval_num=interval_num,
+                        )
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
                         ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
@@ -195,7 +184,7 @@ def copaint(
                         while use_adaptive_lr_xt:
                             with torch.no_grad():
                                 adj_noise_res = model(
-                                    new_adj_t, time - 1, mask=adj_mask
+                                    new_adj_t, time, mask=adj_mask
                                 )
                                 adj_0 = pred_x0(
                                     et=adj_noise_res,
@@ -205,11 +194,9 @@ def copaint(
                                     scheduler=noise_scheduler,
                                     interval_num=interval_num,
                                 )
-
-                                # new_loss = loss_fn(
-                                #     target_adj, adj_0, target_mask
-                                # ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
-                                new_loss = loss_fn(target_adj, adj_0, target_mask)
+                                new_loss = loss_fn(
+                                    target_adj, adj_0, target_mask
+                                ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
                                 if not torch.isnan(new_loss) and new_loss <= loss:
                                     break
                                 else:
@@ -223,7 +210,25 @@ def copaint(
                             torch.cuda.empty_cache()
 
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
+                        adj_noise_res = model(
+                                    adj_t, time, mask=adj_mask
+                                )
+                        adj_0 = pred_x0(
+                                    et=adj_noise_res,
+                                    xt=adj_t,
+                                    t=t,
+                                    mask=adj_mask,
+                                    scheduler=noise_scheduler,
+                                    interval_num=interval_num,
+                                )
                         adj_0s.append(adj_0)
+
+                    adj_noise_res = model(adj_t, time, mask=adj_mask)
+                    adj_tm1 = noise_scheduler.step(adj_noise_res, t, adj_t).prev_sample
+                    res = adj_tm1 - adj_t
+                    res = (res + res.transpose(-1, -2)) / sqrt_2
+                    res = res * adj_mask
+                    adj_t = adj_t + res
 
                 # time-travel (forward diffusion)
                 if time_travel and (cur_t + 1) <= T - tau:
@@ -262,7 +267,7 @@ def copaint(
         target_loss = [0 for _ in range(len(adj_0s))]
         for i in range(len(adj_0s)):
             target_loss[i] = (
-                torch.sum((adj_0s[i] * adj_mask - target_adj * adj_mask) ** 2)
+                torch.sum((adj_0s[i] * target_mask - target_adj * target_mask) ** 2)
                 .cpu()
                 .detach()
                 .numpy()

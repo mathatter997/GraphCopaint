@@ -60,6 +60,7 @@ from configs.enzyme import EnzymeConfig
 @click.option("--lr_xt_decay", default=1.05)
 @click.option("--coef_xt_reg", default=0.01)
 @click.option("--coef_xt_reg_decay", default=1.0)
+@click.option("--use_adaptive_lr_xt", default=True)
 def inference(
     config_type,
     checkpoint_path,
@@ -86,6 +87,7 @@ def inference(
     lr_xt_decay,
     coef_xt_reg,
     coef_xt_reg_decay,
+    use_adaptive_lr_xt,
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
@@ -232,6 +234,7 @@ def inference(
                 lr_xt_decay=lr_xt_decay,
                 coef_xt_reg=coef_xt_reg,
                 coef_xt_reg_decay=coef_xt_reg_decay,
+                use_adaptive_lr_xt=use_adaptive_lr_xt,
             )
         elif inpainter == 'repaint':
             edges = repaint(
