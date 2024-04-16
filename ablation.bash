@@ -1,10 +1,10 @@
-# ablation 1
+# # ablation 1
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
 lr_xt_list=(0.0025 0.004 0.01 0.1 1)
 for ((i = 0; i < ${#lr_xt_list[@]}; i++)); do
-    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --lr_xt ${lr_xt_list[$i]} \
     --loss_mode $loss_mode --reg_mode $reg_mode \
@@ -23,7 +23,7 @@ loss_mode="naive_inpaint"
 reg_mode="naive_square"
 tau_list=(1 2 5 10)
 for ((i = 0; i < ${#lr_xt_list[@]}; i++)); do
-    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --num_intervals 1 --optimization_steps 2 --tau ${tau_list[$i]} --time_travel True \
@@ -42,7 +42,7 @@ reg_mode="naive_square"
 # lr_xt_decay_list=(1.0 1.01 1.05 1.1 1.2)
 lr_xt_decay_list=(2 5)
 for ((i = 0; i < ${#lr_xt_decay_list[@]}; i++)); do
-    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --lr_xt_decay ${lr_xt_decay_list[$i]} \
@@ -59,7 +59,7 @@ done
 
 loss_mode="inpaint"
 reg_mode="square"
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
@@ -72,7 +72,7 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cp
 
 ablation 5
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'repaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
@@ -87,7 +87,7 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cp
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
     --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --lr_xt_decay 1.02 --use_adaptive_lr_xt False \
@@ -100,4 +100,18 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cp
     --log_x0_predictions True
 
 
+# ablation 7
 
+loss_mode="inpaint"
+reg_mode="square"
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu False --num_samples 60 \
+    --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
+    --loss_mode $loss_mode --reg_mode $reg_mode \
+    --lr_xt_decay 1.02 --use_adaptive_lr_xt False \
+    --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
+    --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
+    --scheduler_path models/Community_small/scheduler_config.json \
+    --output_path data/dataset/ablation/output_com_small_copaint_a7_0.json \
+    --mask_path data/dataset/ablation/mask_com_small_copaint_a7_0.json \
+    --masked_output_path data/dataset/ablation/masked_com_small_copaint_a7_0.json \
+    --log_x0_predictions True
