@@ -128,7 +128,6 @@ def copaint(
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
     if log_x0_predictions:
-        adj_0s = []
         wandb.init(
             # set the wandb project where this run will be logged
             project="Copaint Ablation",
@@ -177,7 +176,6 @@ def copaint(
                             scheduler=noise_scheduler,
                             interval_num=interval_num,
                         )
-                        # adj_0_ = adj_0
                         loss = loss_fn(
                             target_adj, adj_0, target_mask
                         ) + coef_xt_reg * reg_fn(origin_adj, adj_t)
@@ -213,7 +211,7 @@ def copaint(
                                     break
                                 else:
                                     lr_xt_temp *= 0.8
-                                    del new_adj_t, adj_0, new_loss
+                                    del new_adj_t, new_loss
                                     new_adj_t = adj_t - lr_xt_temp * adj_t_grad * loss_norm
                         # optimized x, pred_x0, and e_t
                         adj_t = new_adj_t.detach().requires_grad_()
@@ -243,7 +241,6 @@ def copaint(
                             / sz
                         )
                         wandb.log({"time_step": t_, "target_loss": target_loss.item()})
-                        adj_0s.append(adj_0)
                         del adj_noise_res, adj_0
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
