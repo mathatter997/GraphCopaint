@@ -23,7 +23,7 @@ def plot_loss_and_samples(config, adj_0s, size):
     plt.clf()
     times = np.array([1000, 800, 600, 400, 200, 1]) - 1
     for t in times:
-        edges = adj_0s[999 - t][0,0,:size,:size].reshape(size, size).detach().numpy()
+        edges = adj_0s[999 - t][0,0,:size,:size].reshape(size, size).detach().cput().numpy()
         if config.data_name != 'Community_small_smooth':
             G = nx.Graph()
             for i in range(size):

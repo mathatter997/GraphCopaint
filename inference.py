@@ -178,8 +178,8 @@ def inference(
                 masks.append(mask.reshape(1, 1, 24, 24))
                 sizes.append(size)
                 targets[i] = target.reshape(1, 1, 24, 24)
-            masks = torch.vstack(masks)
-            targets = torch.vstack(targets)
+            masks = torch.vstack(masks, device=accelerator.device)
+            targets = torch.vstack(targets, device=accelerator.device)
                         
     else:
         sizes = torch.multinomial(
