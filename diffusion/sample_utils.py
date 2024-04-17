@@ -105,7 +105,9 @@ def pred_x0(et, xt, t, mask, scheduler, interval_num):
         res = res * mask
         x0 = xt + res
     else:
-        ts = np.linspace(0, t, interval_num, dtype=int)
+        if t == 0:
+            return xt
+        ts = np.linspace(0, t, interval_num + 1, dtype=int)
         ts = np.unique(ts)
         ts = ts[::-1]
         timepairs = list(zip(ts[:-1], ts[1:]))

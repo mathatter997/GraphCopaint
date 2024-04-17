@@ -1,10 +1,7 @@
 import os
 import torch
-import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
-import copy
 from .sample_utils import get_loss_fn, pred_x0, get_reg_fn
+from evaluation.dataviz_utils import plot_loss_and_samples
 import wandb
 
 
@@ -18,13 +15,8 @@ def sample(
     sizes=None,
     log_x0_predictions=False,
 ):
-    if inference_timesteps is None:
-        noise_scheduler.set_timesteps(num_inference_steps)
-    else:
-        noise_scheduler.num_inference_steps = len(inference_timesteps)
-        noise_scheduler.timesteps = torch.from_numpy(inference_timesteps).to(
-            accelerator.device
-        )
+    model.eval()
+    noise_scheduler.set_timesteps(num_inference_steps)
 
     batch_size = len(sizes)
     sqrt_2 = 2**0.5
@@ -40,15 +32,22 @@ def sample(
     adj_t = (adj_t + adj_t.transpose(-1, -2)) / sqrt_2
     adj_t = adj_t * adj_mask
     num_timesteps = len(noise_scheduler.timesteps)
-    adj_0s = []
+    if log_x0_predictions:
+        adj_0s = []
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
             # time = t.to(device=accelerator.device).reshape(-1)
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
             if config.sampler == "vpsde":
-                edge_noise_res = model(adj_t, time * num_timesteps, mask=adj_mask)
+                if config.data_name != 'Community_small_smooth':
+                    edge_noise_res = model(adj_t, time * num_timesteps, mask=adj_mask)
+                else:
+                    edge_noise_res = model(adj_t, time * num_timesteps).sample * adj_mask
             else:
-                edge_noise_res = model(adj_t, time, mask=adj_mask)
+                if config.data_name != 'Community_small_smooth':
+                    edge_noise_res = model(adj_t, time, mask=adj_mask)
+                else:
+                     edge_noise_res = model(adj_t, time).sample * adj_mask
         if config.sampler == "vpsde":
             adj_next, _ = noise_scheduler.step_pred(score=edge_noise_res, t=t, x=adj_t)
         else:
@@ -67,28 +66,10 @@ def sample(
                 interval_num=1,
             )
             adj_0s.append(adj_0)
-        # adj_t = torch.clip(adj_t, -3, 3)
-        # adj_t = torch.clip(adj_t, -3, 3)
-        # if t.item() in {999, 749, 499, 249, 159, 49, 29, 19, 9}:
-        #     g = (input_e + 1) / 2  * adj_mask
-        #     g = (g[:, :, :n, :n]).view(n,n)
-        #     g = g + g.T
-        #     graph = nx.from_numpy_array(g.numpy(), edge_attr='weight')
-        #     print(graph)
-        #     pos = nx.circular_layout(graph)
-        #     edges,weights = zip(*nx.get_edge_attributes(graph,'weight').items())
-        #     nx.draw(graph, pos, node_color='b', edgelist=edges, edge_color=weights, width=1.0, edge_cmap=plt.cm.Blues)
-        #     plt.savefig('edges/edges_{}.png'.format(t))
     if log_x0_predictions:
-        sz = torch.numel(adj_t)
-        for i in range(len(adj_0s)):
-            adj_0s[i] = torch.sum((adj_0s[i] - adj_t) ** 2).cpu().numpy() / sz
-        adj_0s = np.array(adj_0s)
-        time = noise_scheduler.timesteps.cpu().numpy()
-        plt.plot(time, adj_0s)
-        plt.savefig(
-            fname=f"data/dataset/{config.data_name}_maskloss_{config.sampler}.pdf"
-        )
+        if len(sizes) == 1:
+            size = sizes[0]
+            plot_loss_and_samples(config, adj_0s, size)
     return adj_t
 
 
@@ -107,7 +88,7 @@ def copaint(
     loss_mode="inpaint",
     reg_mode="square",
     lr_xt=0.0025,
-    lr_xt_decay=1.05,
+    lr_xt_decay=1.0,
     coef_xt_reg=0.01,
     coef_xt_reg_decay=1.0,
     optimize_before_time_travel=False,
@@ -123,7 +104,6 @@ def copaint(
     batch_size = len(sizes)
     loss_norm = batch_size
     sqrt_2 = 2**0.5
-    init_lr = lr_xt
 
     adj_shape = (batch_size, 1, config.max_n_nodes, config.max_n_nodes)
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
@@ -147,8 +127,8 @@ def copaint(
     )
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
-    
     if log_x0_predictions:
+        adj_0s = []
         wandb.init(
             # set the wandb project where this run will be logged
             project="Copaint Ablation",
@@ -163,13 +143,15 @@ def copaint(
                 "repeat_tt": repeat_tt,
                 "loss_mode": loss_mode,
                 "reg_mode": reg_mode,
-                "lr_xt": init_lr,
+                "lr_xt": lr_xt,
                 "lr_xt_decay": lr_xt_decay,
                 "coef_xt_reg": coef_xt_reg,
                 "coef_xt_reg_decay": coef_xt_reg_decay,
+                "sampler": config.sampler,
             },
         )
     for prev_t, cur_t in time_pairs:
+        print(prev_t)
         for repeat_step in range(repeat_tt):
             # optimize x_t given x_0
             with torch.enable_grad():
@@ -183,7 +165,10 @@ def copaint(
                         (batch_size,), t.item(), device=accelerator.device
                     )
                     for step in range(num_iteration_optimize_xt):
-                        adj_noise_res = model(adj_t, time, mask=adj_mask)
+                        if config.data_name != 'Community_small_smooth':
+                            adj_noise_res = model(adj_t, time, mask=adj_mask)
+                        else:
+                            adj_noise_res = model(adj_t, time).sample * adj_mask
                         adj_0 = pred_x0(
                             et=adj_noise_res,
                             xt=adj_t,
@@ -208,9 +193,10 @@ def copaint(
                         lr_xt_temp = lr_xt
                         while use_adaptive_lr_xt:
                             with torch.no_grad():
-                                adj_noise_res = model(
-                                    new_adj_t, time, mask=adj_mask
-                                )
+                                if config.data_name != 'Community_small_smooth':
+                                    adj_noise_res = model(new_adj_t, time, mask=adj_mask)
+                                else:
+                                    adj_noise_res = model(new_adj_t, time).sample * adj_mask
                                 adj_0 = pred_x0(
                                     et=adj_noise_res,
                                     xt=new_adj_t,
@@ -224,7 +210,6 @@ def copaint(
                                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
                                 new_loss = new_loss / loss_norm
                                 if not torch.isnan(new_loss) and new_loss <= loss:
-                                    # print(f'{torch.norm(adj_0_ - adj_0).item():.4f}', f'{(loss - new_loss).item():.4f}', f'{loss.item():.4f}', lr_xt_temp, lr_xt,t_)
                                     break
                                 else:
                                     lr_xt_temp *= 0.8
@@ -237,9 +222,10 @@ def copaint(
                             torch.cuda.empty_cache()
 
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
-                        adj_noise_res = model(
-                                    adj_t, time, mask=adj_mask
-                                )
+                        if config.data_name != 'Community_small_smooth':
+                            adj_noise_res = model(adj_t, time, mask=adj_mask)
+                        else:
+                            adj_noise_res = model(adj_t, time).sample * adj_mask
                         adj_0 = pred_x0(
                                     et=adj_noise_res,
                                     xt=adj_t,
@@ -257,11 +243,15 @@ def copaint(
                             / sz
                         )
                         wandb.log({"time_step": t_, "target_loss": target_loss.item()})
+                        adj_0s.append(adj_0)
                         del adj_noise_res, adj_0
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 
-                    adj_noise_res = model(adj_t, time, mask=adj_mask)
+                    if config.data_name != 'Community_small_smooth':
+                        adj_noise_res = model(adj_t, time, mask=adj_mask)
+                    else:
+                        adj_noise_res = model(adj_t, time).sample * adj_mask
                     adj_tm1 = noise_scheduler.step(adj_noise_res, t, adj_t).prev_sample
                     res = adj_tm1 - adj_t
                     res = (res + res.transpose(-1, -2)) / sqrt_2
@@ -298,7 +288,6 @@ def copaint(
 
         lr_xt *= lr_xt_decay
         coef_xt_reg *= coef_xt_reg_decay
-
     adj_t = adj_t * adj_mask
     return adj_t
 
@@ -356,6 +345,7 @@ def repaint(
                 "time_travel": time_travel,
                 "tau": tau,
                 "repeat_tt": repeat_tt,
+                "sampler": config.sampler,
             },
         )
     for prev_t, cur_t in time_pairs:
@@ -394,6 +384,10 @@ def repaint(
                     adj_t = (1 - target_mask) * adj_t + target_mask * adj_target_t
 
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
+                        if config.sampler == "vpsde":
+                            edge_noise_res = model(adj_t, time * T, mask=adj_mask)
+                        else:
+                            edge_noise_res = model(adj_t, time, mask=adj_mask)
                         adj_0 = pred_x0(
                             et=edge_noise_res,
                             xt=adj_t,
@@ -411,7 +405,7 @@ def repaint(
                             / sz
                         )
                         wandb.log({"time_step": t_, "target_loss": target_loss.item()})
-                        del adj_0
+                        del adj_0, edge_noise_res
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 

@@ -2,6 +2,7 @@ import os
 import time 
 import torch
 import click
+import numpy as np
 import networkx as nx
 from accelerate import Accelerator
 from diffusion.pgsn import PGSN
@@ -12,7 +13,7 @@ from data.dataset import get_dataset
 from diffusion.sample import sample, copaint, repaint
 from data.utils import Lobster, prepare_json_dataset
 from diffusion.ema import ExponentialMovingAverage
-from configs.com_small import CommunitySmallConfig
+from configs.com_small import CommunitySmallConfig, CommunitySmallSmoothConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
@@ -91,6 +92,8 @@ def inference(
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
+    elif config_type == "community_small_smooth":
+        config = CommunitySmallSmoothConfig()
     elif config_type == "ego_small":
         config = EgoSmallConfig()
     elif config_type == "ego":
@@ -105,48 +108,79 @@ def inference(
         project_dir=os.path.join(config.output_dir, "logs"),
         cpu=cpu,
     )
-    targets, _, _, n_node_pmf = get_dataset(
-        config.data_filepath, config.data_name, device=accelerator.device
-    )
-    config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+
+    split = 0.8
+    if config_type != 'community_small_smooth':
+        targets, _, _, n_node_pmf = get_dataset(
+            config.data_filepath, config.data_name, device=accelerator.device, split=split
+        )
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+    else:
+        dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
+        num_train = int(len(dataset) * split)
+        targets = dataset[:num_train]
+        n_node_pmf = np.zeros(24)
+        for i in range(len(targets)):
+            _, mask = targets[i]
+            mask = mask.reshape(24, 24)
+            n = int((1 + torch.sum(mask[0])).item())
+            n_node_pmf[n] += 1
+        n_node_pmf /= np.sum(n_node_pmf)
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+
     if inpainter != 'none':
-        # if inpainter == 'copaint':
-        #     assert sampler == 'ddim'
         assert mask_path is not None and masked_output_path is not None
         all_batches = []
         sizes = []
-        while True:
-            for graph in targets:
-                n = graph.num_nodes
-                adj = torch.zeros(1, 1, max_n_nodes, max_n_nodes)
-                adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
-                all_batches.append(adj)
-                sizes.append(n)
+        if config_type != 'community_small_smooth':
+            while True:
+                for graph in targets:
+                    n = graph.num_nodes
+                    adj = torch.zeros(1, 1, max_n_nodes, max_n_nodes)
+                    adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
+                    all_batches.append(adj)
+                    sizes.append(n)
+                    if len(sizes) == num_samples:
+                        break
                 if len(sizes) == num_samples:
                     break
-            if len(sizes) == num_samples:
-                break
-        targets = torch.cat(all_batches, dim=0)
-        targets = targets.to(device=accelerator.device)
-        targets = targets * 2 - 1
-        masks = torch.ones(targets.shape, device=accelerator.device)
-        masks = torch.tril(masks, diagonal=-1)
-        for k, size in enumerate(sizes):
-            masks[k, :, size:] = 0
-            unseen = torch.randperm(size)[:size - unmask_size]
-            # unseen = torch.arange(unmask_size,size)
-            for node in unseen:
-                masks[k, :, node, :] = 0
-                masks[k, :, :, node] = 0
-        masks = masks + masks.transpose(-1, -2)
-        masked_targets = (targets * masks).cpu().numpy()[:num_samples]
-        masked_targets = masked_targets > 0
-        pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masked_targets]
-        pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
-        prepare_json_dataset(pred_adj_list, masked_output_path)
-        pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masks.cpu().numpy()[:num_samples]]
-        pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
-        prepare_json_dataset(pred_adj_list, mask_path)
+            targets = torch.cat(all_batches, dim=0)
+            targets = targets.to(device=accelerator.device)
+            targets = targets * 2 - 1
+            masks = torch.ones(targets.shape, device=accelerator.device)
+            masks = torch.tril(masks, diagonal=-1)
+            for k, size in enumerate(sizes):
+                masks[k, :, size:] = 0
+                unseen = torch.randperm(size)[:size - unmask_size]
+                # unseen = torch.arange(unmask_size,size)
+                for node in unseen:
+                    masks[k, :, node, :] = 0
+                    masks[k, :, :, node] = 0
+            masks = masks + masks.transpose(-1, -2)
+            masked_targets = (targets * masks).cpu().numpy()[:num_samples]
+            masked_targets = masked_targets > 0
+            pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masked_targets]
+            pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
+            prepare_json_dataset(pred_adj_list, masked_output_path)
+            pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masks.cpu().numpy()[:num_samples]]
+            pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
+            prepare_json_dataset(pred_adj_list, mask_path)
+        else:
+            masks = []
+            for i in range(len(targets)):
+                target, mask = targets[i]
+                mask = mask.reshape(24, 24)
+                size = int((1 + torch.sum(mask[0])).item())
+                unseen = torch.randperm(size)[:size - unmask_size]
+                for node in unseen:
+                    mask[node, :] = 0
+                    mask[:, node] = 0
+                masks.append(mask.reshape(1, 1, 24, 24))
+                sizes.append(size)
+                targets[i] = target.reshape(1, 1, 24, 24)
+            masks = torch.vstack(masks)
+            targets = torch.vstack(targets)
+                        
     else:
         sizes = torch.multinomial(
             torch.Tensor(n_node_pmf), num_samples, replacement=True

@@ -13,7 +13,6 @@ from data.dataset import get_dataset
 from diffusion.pgsn import PGSN
 from diffusion.ema import ExponentialMovingAverage
 from diffusers.optimization import (
-    get_cosine_schedule_with_warmup,
     get_constant_schedule,
 )
 from configs.com_small import CommunitySmallConfig, CommunitySmallSmoothConfig
@@ -65,7 +64,6 @@ def train_ddpm(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         ) 
     else:
-        split = 0.8
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
         train_dataset = dataset[:num_train]
