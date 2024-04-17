@@ -106,8 +106,8 @@ reg_mode="naive_square"
 #     --mask_path data/dataset/ablation/mask_com_small_copaint_a6_0.json \
 #     --masked_output_path data/dataset/ablation/masked_com_small_copaint_a6_0.json \
 #     --log_x0_predictions True
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small_smooth  --cpu False --num_samples 1 \
-    --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small_smooth  --cpu True --num_samples 1 \
+    --sampler ddim --inpainter 'none' --num_timesteps 1000 \
     --loss_mode $loss_mode --reg_mode $reg_mode \
     --lr_xt_decay 1.0 --use_adaptive_lr_xt True \
     --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
