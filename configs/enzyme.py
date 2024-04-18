@@ -42,3 +42,5 @@ class EnzymeConfig:
     attn_clamp = False
     beta_start = 0.0001
     beta_end = 0.02
+
+    data_format = 'graph'

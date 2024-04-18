@@ -16,6 +16,7 @@ from diffusers.optimization import (
     get_constant_schedule,
 )
 from configs.com_small import CommunitySmallConfig, CommunitySmallSmoothConfig
+from configs.mnist_zeros import MnistZerosConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
@@ -27,6 +28,7 @@ from configs.enzyme import EnzymeConfig
               default='community_small',
               type=click.Choice(['community_small',
                                  'community_small_smooth',
+                                 'mnist_zeros',
                                  'ego_small',
                                  'ego',
                                  'enzyme'], case_sensitive=False),
@@ -39,6 +41,8 @@ def train_ddpm(
         config = CommunitySmallConfig()
     elif config_type == 'community_small_smooth':
         config = CommunitySmallSmoothConfig()
+    elif config_type == 'mnist_zeros':
+        config = MnistZerosConfig()
     elif config_type == 'ego_small':
         config = EgoSmallConfig()
     elif config_type == 'ego':
@@ -55,7 +59,7 @@ def train_ddpm(
         cpu=cpu,
     )
     split = 0.8
-    if config_type != 'community_small_smooth':
+    if config.data_format == 'graph':
         train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
@@ -63,7 +67,7 @@ def train_ddpm(
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         ) 
-    else:
+    elif config.data_format == 'pixel':
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
         train_dataset = dataset[:num_train]
@@ -71,7 +75,7 @@ def train_ddpm(
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         )
-    if config_type != 'community_small_smooth':
+    if config.data_format == 'graph':
         model = PGSN(
             max_node=max_n_nodes,
             nf=config.nf,
@@ -84,7 +88,7 @@ def train_ddpm(
             dropout=config.dropout,
             attn_clamp=config.attn_clamp
         )
-    else:
+    elif config.data_format == 'pixel':
         model = UNet2DModel(
             sample_size=(max_n_nodes, max_n_nodes),
             in_channels=1,

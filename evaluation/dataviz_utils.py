@@ -23,7 +23,7 @@ def plot_loss_and_samples(config, adj_0s, size):
     plt.clf()
     times = np.array([1000, 800, 600, 400, 200, 1]) - 1
     for t in times:
-        edges = adj_0s[999 - t][0,0,:size,:size].reshape(size, size).detach().cput().numpy()
+        edges = adj_0s[999 - t][0,0,:size,:size].reshape(size, size).detach().cpu().numpy()
         if config.data_name != 'Community_small_smooth':
             G = nx.Graph()
             for i in range(size):
@@ -39,6 +39,6 @@ def plot_loss_and_samples(config, adj_0s, size):
             plt.clf()
         else:
             plt.figure(figsize=(8, 6))
-            sns.heatmap(edges, cmap='Blues', annot=False, fmt=".2f")
+            sns.heatmap(edges, cmap='Blues', annot=False, fmt=".2f",xticklabels=False, yticklabels=False, cbar=False)
             plt.savefig(f'data/images/heatmap_t={t}.png')
             plt.clf()

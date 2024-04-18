@@ -14,6 +14,7 @@ from diffusion.sample import sample, copaint, repaint
 from data.utils import Lobster, prepare_json_dataset
 from diffusion.ema import ExponentialMovingAverage
 from configs.com_small import CommunitySmallConfig, CommunitySmallSmoothConfig
+from configs.mnist_zeros import MnistZerosConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
@@ -25,9 +26,10 @@ from configs.enzyme import EnzymeConfig
     type=click.Choice(
         ["community_small",
          "community_small_smooth",
-        "ego_small", 
-        "ego", 
-        "enzyme"], case_sensitive=False
+         "mnist_zeros",
+         "ego_small", 
+         "ego", 
+         "enzyme"], case_sensitive=False
     ),
 )
 @click.option("--checkpoint_path")
@@ -94,6 +96,8 @@ def inference(
         config = CommunitySmallConfig()
     elif config_type == "community_small_smooth":
         config = CommunitySmallSmoothConfig()
+    elif config_type == 'mnist_zeros':
+        config = MnistZerosConfig()
     elif config_type == "ego_small":
         config = EgoSmallConfig()
     elif config_type == "ego":
@@ -110,12 +114,12 @@ def inference(
     )
 
     split = 0.8
-    if config_type != 'community_small_smooth':
+    if config.data_format == 'graph':
         targets, _, _, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
         config.max_n_nodes = max_n_nodes = len(n_node_pmf)
-    else:
+    elif config.data_format == 'pixel':
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
         targets = dataset[:num_train]
@@ -132,7 +136,7 @@ def inference(
         assert mask_path is not None and masked_output_path is not None
         all_batches = []
         sizes = []
-        if config_type != 'community_small_smooth':
+        if config.data_format == 'graph':
             while True:
                 for graph in targets:
                     n = graph.num_nodes
@@ -165,19 +169,19 @@ def inference(
             pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masks.cpu().numpy()[:num_samples]]
             pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
             prepare_json_dataset(pred_adj_list, mask_path)
-        else:
+        elif config.data_format == 'pixel':
             masks = []
             for i in range(len(targets)):
                 target, mask = targets[i]
-                mask = mask.reshape(24, 24)
+                mask = mask.reshape(max_n_nodes, max_n_nodes)
                 size = int((1 + torch.sum(mask[0])).item())
                 unseen = torch.randperm(size)[:size - unmask_size]
                 for node in unseen:
                     mask[node, :] = 0
                     mask[:, node] = 0
-                masks.append(mask.reshape(1, 1, 24, 24))
+                masks.append(mask.reshape(1, 1, max_n_nodes, max_n_nodes))
                 sizes.append(size)
-                targets[i] = target.reshape(1, 1, 24, 24)
+                targets[i] = target.reshape(1, 1, max_n_nodes, max_n_nodes)
             masks = torch.vstack(masks).to(device=accelerator.device)
             targets = torch.vstack(targets).to(device=accelerator.device)
                         
@@ -200,7 +204,7 @@ def inference(
         )
     elif sampler == "vpsde":
         noise_scheduler = ScoreSdeVpScheduler()
-    if config_type != 'community_small_smooth':
+    if config.data_format == 'graph':
         model = PGSN(
             max_node=max_n_nodes,
             nf=config.nf,
@@ -213,7 +217,7 @@ def inference(
             dropout=config.dropout,
             attn_clamp=config.attn_clamp,
         )
-    else:
+    elif config.data_format == 'pixel':
         model = UNet2DModel(
             sample_size=(max_n_nodes, max_n_nodes),
             in_channels=1,

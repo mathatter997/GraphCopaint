@@ -42,6 +42,8 @@ class CommunitySmallConfig:
     attn_clamp = False
     beta_start = 0.0001
     beta_end = 0.005
+    
+    data_format = 'graph'
 
 
 @dataclass
@@ -71,18 +73,7 @@ class CommunitySmallSmoothConfig:
     )
     seed = 0
     ema_rate = 0.9999
-    normalization = "GroupNorm"
-    nonlinearity = "swish"
-    nf = 256
-    # nf=128
-    num_gnn_layers = 4
-    size_cond = False
-    embedding_type = "positional"
-    rw_depth = 16
-    graph_layer = "PosTransLayer"
-    edge_th = -1
-    heads = 8
-    dropout=0.1
-    attn_clamp = False
     beta_start = 0.0001
     beta_end = 0.005
+
+    data_format = 'pixel'
