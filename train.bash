@@ -7,4 +7,4 @@
 # CUDA_VISIBLE_DEVICES="0" python train.py --cpu False --config_type ego
 # CUDA_VISIBLE_DEVICES="0" python train.py --cpu False --config_type enzyme
 
-CUDA_VISIBLE_DEVICES="2" python train.py --cpu False --config_type mnist_zeros
+CUDA_VISIBLE_DEVICES="1" python train.py --cpu True --config_type mnist_zeros

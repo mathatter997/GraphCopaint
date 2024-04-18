@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from .utils import dense_adj
 from tqdm.auto import tqdm
 from .ema import ExponentialMovingAverage
+from .sample_utils import predict_e0
 
 def train_loop(
     config,
@@ -59,9 +60,9 @@ def train_loop(
         progress_bar.set_description(f"Epoch {epoch}")
 
         for step, batch in enumerate(train_dataloader):
-            if config.data_name != 'Community_small_smooth':
+            if config.data_format == 'graph':
                 adj, adj_mask = dense_adj(batch, max_n_nodes, scale_data)
-            else:
+            elif config.data_format == 'pixel':
                 adj, adj_mask = batch
                 adj = scale_data(adj) * adj_mask
             edge_noise = torch.randn(adj.shape, device=accelerator.device)
@@ -82,11 +83,8 @@ def train_loop(
             noisy_edges = noisy_edges * adj_mask
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                if config.data_name != 'Community_small_smooth':
-                    noise_edge_pred = model(noisy_edges, timesteps, mask=adj_mask)
-                else:
-                    noise_edge_pred = model(noisy_edges, timesteps).sample * adj_mask
-                loss = F.mse_loss(noise_edge_pred, edge_noise)
+                e0 = predict_e0(config, model, noisy_edges, timesteps, -1, adj_mask)
+                loss = F.mse_loss(e0, edge_noise)
 
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)

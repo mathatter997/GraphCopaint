@@ -50,6 +50,7 @@ def train_ddpm(
     elif config_type == 'enzyme':
         config = EnzymeConfig()
     config.checkpoint_path = checkpoint_path
+    config.sampler = 'ddpm'
 
     accelerator = Accelerator(
         mixed_precision=config.mixed_precision,
@@ -75,6 +76,7 @@ def train_ddpm(
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         )
+
     if config.data_format == 'graph':
         model = PGSN(
             max_node=max_n_nodes,
