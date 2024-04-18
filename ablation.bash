@@ -97,7 +97,7 @@ for ((i = 0; i < ${#lr_xt_decay_list[@]}; i++)); do
         --mask_path data/dataset/ablation/mask_com_small_smooth_copaint_a1_${i}.json \
         --masked_output_path data/dataset/ablation/masked_com_small_smooth_copaint_a1_${i}.json \
         --log_x0_predictions True
-do;
+done
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
@@ -113,7 +113,7 @@ for ((i = 0; i < ${#lr_xt_decay_list[@]}; i++)); do
         --mask_path data/dataset/ablation/mask_com_small_smooth_copaint_a2_${i}.json \
         --masked_output_path data/dataset/ablation/masked_com_small_smooth_copaint_a2_${i}.json \
         --log_x0_predictions True
-do;
+done
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
@@ -127,7 +127,7 @@ CUDA_VISIBLE_DEVICES="2" python inference.py --config_type community_small_smoot
     --mask_path data/dataset/ablation/mask_com_small_smooth_copaint_a3.json \
     --masked_output_path data/dataset/ablation/masked_com_small_smooth_copaint_a3.json \
     --log_x0_predictions True
-do;
+done
 
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
@@ -141,7 +141,7 @@ CUDA_VISIBLE_DEVICES="2" python inference.py --config_type community_small_smoot
     --mask_path data/dataset/ablation/mask_com_small_smooth_copaint_a4.json \
     --masked_output_path data/dataset/ablation/masked_com_small_smooth_copaint_a4.json \
     --log_x0_predictions True
-do;
+done
 
 
 
