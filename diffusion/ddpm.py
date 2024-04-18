@@ -93,9 +93,6 @@ def train_loop(
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
-            del noisy_edges, e0, edge_noise
-            if accelerator.device.type == "cuda":
-                torch.cuda.empty_cache()
             progress_bar.update(1)
             logs = {
                 "loss": loss.detach().item(),
