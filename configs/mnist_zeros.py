@@ -4,7 +4,7 @@ from dataclasses import dataclass
 class MnistZerosConfig:
     max_n_nodes = None
     data_filepath = "data/dataset/"
-    data_name = "Mnist_zeros"
+    data_name = "mnist_zeros"
     train_batch_size = 32
     eval_batch_size = 32  # how many to sample during evaluation
     num_epochs = 400000
