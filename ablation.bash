@@ -90,6 +90,7 @@ for ((i = 0; i < ${#lr_xt_decay_list[@]}; i++)); do
     CUDA_VISIBLE_DEVICES="2" python inference.py --config_type community_small_smooth  --cpu False --num_samples 32 \
         --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
         --loss_mode $loss_mode --reg_mode $reg_mode \
+        --lr_xt_decay ${lr_xt_decay_list[$i]} \
         --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
         --checkpoint_path models/Community_small_smooth/gnn/checkpoint_epoch_20000_t1000_psgn.pth \
         --scheduler_path models/Community_small_smooth/scheduler_config.json \
@@ -106,6 +107,7 @@ for ((i = 0; i < ${#lr_xt_decay_list[@]}; i++)); do
     CUDA_VISIBLE_DEVICES="2" python inference.py --config_type community_small_smooth  --cpu False --num_samples 32 \
         --sampler ddpm --inpainter 'copaint' --num_timesteps 1000 \
         --loss_mode $loss_mode --reg_mode $reg_mode \
+        --lr_xt_decay ${lr_xt_decay_list[$i]} \
         --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
         --checkpoint_path models/Community_small_smooth/gnn/checkpoint_epoch_20000_t1000_psgn.pth \
         --scheduler_path models/Community_small_smooth/scheduler_config.json \
