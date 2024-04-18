@@ -93,6 +93,9 @@ def train_loop(
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
+            del noisy_edges, e0, edge_noise
+            if accelerator.device.type == "cuda":
+                torch.cuda.empty_cache()
             progress_bar.update(1)
             logs = {
                 "loss": loss.detach().item(),
@@ -105,27 +108,27 @@ def train_loop(
             accelerator.log(logs, step=global_step)
             global_step += 1
 
-            # After each epoch you optionally sample some demo images with evaluate() and save the model
-            if accelerator.is_main_process:
-                # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
-                if (
-                    epoch + 1
-                ) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
-                    noise_scheduler.save_pretrained(config.output_dir)
-                    file_path = config.output_dir + config.output_dir_gnn.format(
-                        str(epoch + 1 + config.start) + label
-                    )
-                    directory = os.path.dirname(file_path)
-                    if not os.path.exists(directory):
-                        os.makedirs(directory)
-                    torch.save(
-                        {
-                            "epoch": epoch,
-                            "model_state_dict": accelerator.unwrap_model(
-                                model
-                            ).state_dict(),
-                            "optimizer_state_dict": optimizer.state_dict(),
-                            "ema_state_dict": ema.state_dict(),
-                        },
-                        file_path,
-                    )
+        # After each epoch you optionally sample some demo images with evaluate() and save the model
+        if accelerator.is_main_process:
+            # pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
+            if (
+                epoch + 1
+            ) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
+                noise_scheduler.save_pretrained(config.output_dir)
+                file_path = config.output_dir + config.output_dir_gnn.format(
+                    str(epoch + 1 + config.start) + label
+                )
+                directory = os.path.dirname(file_path)
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": accelerator.unwrap_model(
+                            model
+                        ).state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "ema_state_dict": ema.state_dict(),
+                    },
+                    file_path,
+                )
