@@ -106,7 +106,7 @@ def train_ddpm(
     ema = ExponentialMovingAverage(model.parameters(), decay=config.ema_rate)
     if checkpoint_path:
         # checkpoint = torch.load(config.output_dir + config.load_model_dir)
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, device=accelerator.device)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         ema.load_state_dict(checkpoint['ema_state_dict'])
