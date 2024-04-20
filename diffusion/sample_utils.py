@@ -100,6 +100,7 @@ def reflect_pred(x0, xt, mask):
     res = (res + res.transpose(-1, -2)) / sqrt_2
     res = res * mask
     x0 = xt + res
+    return x0
 
 def pred_x0(et, xt, t, mask, scheduler, interval_num, reflect=True):
     if interval_num == 1:
