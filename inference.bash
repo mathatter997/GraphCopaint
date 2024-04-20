@@ -1,42 +1,42 @@
 # /bin/bash
 
 # ddim
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
- --sampler ddim \
- --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
- --scheduler_path models/Community_small/scheduler_config.json \
- --output_path data/dataset/output_com_small_ddim.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
+#  --sampler ddim \
+#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
+#  --scheduler_path models/Community_small/scheduler_config.json \
+#  --output_path data/dataset/output_com_small_ddim.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
- --sampler ddim \
- --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
- --scheduler_path models/Ego_small/scheduler_config.json \
- --output_path data/dataset/output_ego_small_ddim.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
+#  --sampler ddim \
+#  --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddim.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
- --sampler ddim \
- --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
- --scheduler_path models/ENZYMES/scheduler_config.json \
- --output_path data/dataset/output_enyzme_ddim.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
+#  --sampler ddim \
+#  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
+#  --scheduler_path models/ENZYMES/scheduler_config.json \
+#  --output_path data/dataset/output_enyzme_ddim.json
 
-# ddpm 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
- --sampler ddpm \
- --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
- --scheduler_path models/Community_small/scheduler_config.json \
- --output_path data/dataset/output_com_small_ddpm.json
+# # ddpm 
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
+#  --sampler ddpm \
+#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+#  --scheduler_path models/Community_small/scheduler_config.json \
+#  --output_path data/dataset/output_com_small_ddpm.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
- --sampler ddpm \
- --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
- --scheduler_path models/Ego_small/scheduler_config.json \
- --output_path data/dataset/output_ego_small_ddpm.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
+#  --sampler ddpm \
+#  --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddpm.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
- --sampler ddpm \
- --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
- --scheduler_path models/ENZYMES/scheduler_config.json \
- --output_path data/dataset/output_enyzme_ddpm.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
+#  --sampler ddpm \
+#  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
+#  --scheduler_path models/ENZYMES/scheduler_config.json \
+#  --output_path data/dataset/output_enyzme_ddpm.json
 
 #  CUDA_VISIBLE_DEVICES="2" python inference.py --config_type ego  --cpu False --num_samples 1000 \
 #  --checkpoint_path models/Ego/gnn/checkpoint_epoch_900_t1000_psgn.pth \
@@ -176,3 +176,9 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False -
 #     --mask_path data/dataset/ablation/mask_${data_name}_${inpainter}_a1_0.json \
 #     --masked_output_path data/dataset/ablation/masked_${data_name}_${inpainter}_a1_0.json \
 #     --log_x0_predictions True
+
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1 \
+ --sampler ddim --log_x0_predictions True \
+ --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+ --scheduler_path models/Ego_small/scheduler_config.json \
+ --output_path data/dataset/output_ego_small_ddim.json
