@@ -28,7 +28,7 @@ def sample(
     noise_scheduler.set_timesteps(num_inference_steps)
     num_timesteps = len(noise_scheduler.timesteps)
     reflect = config.reflect
-    zero_diagonal = config.zero.diagonal
+    zero_diagonal = config.zero_diagonal
     adj_t, adj_mask = init_xT(
         config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
     )
@@ -95,7 +95,7 @@ def copaint(
     num_timesteps = num_inference_steps
 
     reflect = config.reflect
-    zero_diagonal = config.zero.diagonal
+    zero_diagonal = config.zero_diagonal
 
     adj_t, adj_mask = init_xT(
         config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
@@ -238,7 +238,7 @@ def repaint(
     sqrt_2 = 2**0.5
 
     reflect = config.reflect
-    zero_diagonal = config.zero.diagonal
+    zero_diagonal = config.zero_diagonal
 
     adj_t, adj_mask = init_xT(
         config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
