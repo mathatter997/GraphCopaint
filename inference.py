@@ -130,7 +130,7 @@ def inference(
             n = int(torch.where(mask[0] == 1)[0][-1].item()) + 1
             n_node_pmf[n] += 1
         n_node_pmf /= np.sum(n_node_pmf)
-        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        config.max_n_nodes = max_n_nodes = 24
 
     if inpainter != 'none':
         assert mask_path is not None and masked_output_path is not None
@@ -174,7 +174,7 @@ def inference(
             for i in range(len(targets)):
                 target, mask = targets[i]
                 mask = mask.reshape(max_n_nodes, max_n_nodes)
-                size = int((1 + torch.sum(mask[0])).item())
+                size = int(torch.where(mask[0] == 1)[0][-1].item()) + 1
                 unseen = torch.randperm(size)[:size - unmask_size]
                 for node in unseen:
                     mask[node, :] = 0
