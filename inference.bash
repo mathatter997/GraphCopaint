@@ -13,7 +13,7 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu Fals
  --scheduler_path models/Ego_small/scheduler_config.json \
  --output_path data/dataset/output_ego_small_ddim.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
  --sampler ddim \
  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
  --scheduler_path models/ENZYMES/scheduler_config.json \
@@ -32,7 +32,7 @@ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu Fals
  --scheduler_path models/Ego_small/scheduler_config.json \
  --output_path data/dataset/output_ego_small_ddpm.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 113 \
  --sampler ddpm \
  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
  --scheduler_path models/ENZYMES/scheduler_config.json \
