@@ -123,11 +123,11 @@ def inference(
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
         targets = dataset[:num_train]
-        n_node_pmf = np.zeros(24)
+        n_node_pmf = np.zeros(25)
         for i in range(len(targets)):
             _, mask = targets[i]
             mask = mask.reshape(24, 24)
-            n = int((torch.sum(mask[0])).item())
+            n = int((torch.where(mask[0] == 1))[-1].item()) + 1
             n_node_pmf[n] += 1
         n_node_pmf /= np.sum(n_node_pmf)
         config.max_n_nodes = max_n_nodes = len(n_node_pmf)
