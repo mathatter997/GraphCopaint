@@ -1,24 +1,47 @@
 # /bin/bash
 
-# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
-#  --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
-#  --scheduler_path models/Community_small/scheduler_config.json \
-#  --output_path data/dataset/output_com_small.json
+# ddim
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
+ --sampler ddim \
+ --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
+ --scheduler_path models/Community_small/scheduler_config.json \
+ --output_path data/dataset/output_com_small_ddim.json
 
-#  CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
-#  --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
-#  --scheduler_path models/Ego_small/scheduler_config.json \
-#  --output_path data/dataset/output_ego_small.json
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
+ --sampler ddim \
+ --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+ --scheduler_path models/Ego_small/scheduler_config.json \
+ --output_path data/dataset/output_ego_small_ddim.json
+
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
+ --sampler ddim \
+ --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
+ --scheduler_path models/ENZYMES/scheduler_config.json \
+ --output_path data/dataset/output_enyzme_ddim.json
+
+# ddpm 
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1000 \
+ --sampler ddpm \
+ --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+ --scheduler_path models/Community_small/scheduler_config.json \
+ --output_path data/dataset/output_com_small_ddpm.json
+
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1000 \
+ --sampler ddpm \
+ --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+ --scheduler_path models/Ego_small/scheduler_config.json \
+ --output_path data/dataset/output_ego_small_ddpm.json
+
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
+ --sampler ddpm \
+ --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
+ --scheduler_path models/ENZYMES/scheduler_config.json \
+ --output_path data/dataset/output_enyzme_ddpm.json
 
 #  CUDA_VISIBLE_DEVICES="2" python inference.py --config_type ego  --cpu False --num_samples 1000 \
 #  --checkpoint_path models/Ego/gnn/checkpoint_epoch_900_t1000_psgn.pth \
 #  --scheduler_path models/Ego/scheduler_config.json \
 #  --output_path data/dataset/output_ego.json
- 
-#  CUDA_VISIBLE_DEVICES="0" python inference.py --config_type enzyme  --cpu False --num_samples 1000 \
-#  --checkpoint_path models/ENZYMES/gnn/checkpoint_epoch_10000_t1000_psgn.pth \
-#  --scheduler_path models/ENZYMES/scheduler_config.json \
-#  --output_path data/dataset/output_enyzme.json
 
 # CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 10 \
 #  --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
@@ -93,8 +116,8 @@
 #     --masked_output_path data/dataset/ablation/masked_com_small_copaint_a6_0.json \
 #     --log_x0_predictions True
 
-loss_mode="naive_inpaint"
-reg_mode="naive_square"
+# loss_mode="naive_inpaint"
+# reg_mode="naive_square"
 # CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small_smooth  --cpu True --num_samples 1 \
 #     --sampler ddim --inpainter 'none' --num_timesteps 1000 \
 #     --loss_mode $loss_mode --reg_mode $reg_mode \
@@ -122,18 +145,34 @@ reg_mode="naive_square"
 #     --log_x0_predictions False
 
 
-loss_mode="naive_inpaint"
-reg_mode="naive_square"
-data_name="mnist_zeros"
-inpainter="none"
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type mnist_zeros  --cpu False --num_samples 1 \
-    --sampler ddim --inpainter ${inpainter} --num_timesteps 1000 \
-    --loss_mode $loss_mode --reg_mode $reg_mode \
-    --lr_xt_decay 1.0 --use_adaptive_lr_xt True \
-    --num_intervals 10 --optimization_steps 0 --tau 1 --time_travel False \
-    --checkpoint_path models/${data_name}/gnn/checkpoint_epoch_20000_t1000_psgn.pth \
-    --scheduler_path models/${data_name}/scheduler_config.json \
-    --output_path data/dataset/ablation/output_${data_name}_${inpainter}_a1_0.json \
-    --mask_path data/dataset/ablation/mask_${data_name}_${inpainter}_a1_0.json \
-    --masked_output_path data/dataset/ablation/masked_${data_name}_${inpainter}_a1_0.json \
-    --log_x0_predictions True
+# loss_mode="naive_inpaint"
+# reg_mode="naive_square"
+# data_name="mnist_zeros"
+# inpainter="none"
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type mnist_zeros  --cpu False --num_samples 1 \
+#     --sampler ddim --inpainter ${inpainter} --num_timesteps 1000 \
+#     --loss_mode $loss_mode --reg_mode $reg_mode \
+#     --lr_xt_decay 1.0 --use_adaptive_lr_xt True \
+#     --num_intervals 10 --optimization_steps 0 --tau 1 --time_travel False \
+#     --checkpoint_path models/${data_name}/gnn/checkpoint_epoch_20000_t1000_psgn.pth \
+#     --scheduler_path models/${data_name}/scheduler_config.json \
+#     --output_path data/dataset/ablation/output_${data_name}_${inpainter}_a1_0.json \
+#     --mask_path data/dataset/ablation/mask_${data_name}_${inpainter}_a1_0.json \
+#     --masked_output_path data/dataset/ablation/masked_${data_name}_${inpainter}_a1_0.json \
+#     --log_x0_predictions True
+
+# loss_mode="naive_inpaint"
+# reg_mode="naive_square"
+# data_name="mnist_zeros"
+# inpainter="none"
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ${data_name}  --cpu True --num_samples 1 \
+#     --sampler ddim --inpainter ${inpainter} --num_timesteps 1000 \
+#     --loss_mode $loss_mode --reg_mode $reg_mode \
+#     --lr_xt_decay 1.0 --use_adaptive_lr_xt True \
+#     --num_intervals 10 --optimization_steps 0 --tau 1 --time_travel False \
+#     --checkpoint_path models/${data_name}/gnn/checkpoint_epoch_300000_t1000_psgn.pth \
+#     --scheduler_path models/${data_name}/scheduler_config.json \
+#     --output_path data/dataset/ablation/output_${data_name}_${inpainter}_a1_0.json \
+#     --mask_path data/dataset/ablation/mask_${data_name}_${inpainter}_a1_0.json \
+#     --masked_output_path data/dataset/ablation/masked_${data_name}_${inpainter}_a1_0.json \
+#     --log_x0_predictions True
