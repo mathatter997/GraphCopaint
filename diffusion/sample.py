@@ -27,7 +27,11 @@ def sample(
     batch_size = len(sizes)
     noise_scheduler.set_timesteps(num_inference_steps)
     num_timesteps = len(noise_scheduler.timesteps)
-    adj_t, adj_mask = init_xT(config, batch_size, sizes, accelerator)
+    reflect = config.reflect
+    zero_diagonal = config.zero.diagonal
+    adj_t, adj_mask = init_xT(
+        config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
+    )
 
     if log_x0_predictions:
         adj_0s = []
@@ -35,7 +39,9 @@ def sample(
         with torch.no_grad():
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
             e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-            adj_t = predict_xnext(config, noise_scheduler, e0, adj_t, adj_mask, t)
+            adj_t = predict_xnext(
+                config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
+            )
 
             if log_x0_predictions:
                 adj_0 = pred_x0(
@@ -45,8 +51,9 @@ def sample(
                     mask=adj_mask,
                     scheduler=noise_scheduler,
                     interval_num=1,
+                    reflect=reflect,
                 )
-                adj_0s.append(adj_0)
+                adj_0s.append(adj_0.cpu())
     if log_x0_predictions:
         if len(sizes) == 1:
             size = sizes[0]
@@ -87,7 +94,12 @@ def copaint(
     noise_scheduler.set_timesteps(num_inference_steps)
     num_timesteps = num_inference_steps
 
-    adj_t, adj_mask = init_xT(config, batch_size, sizes, accelerator)
+    reflect = config.reflect
+    zero_diagonal = config.zero.diagonal
+
+    adj_t, adj_mask = init_xT(
+        config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
+    )
 
     T = noise_scheduler.timesteps[0].item()
     time_pairs = list(
@@ -149,6 +161,7 @@ def copaint(
                         lr_xt,
                         use_adaptive_lr_xt,
                         num_timesteps,
+                        reflect=reflect,
                     )
 
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
@@ -162,6 +175,7 @@ def copaint(
                             mask=adj_mask,
                             scheduler=noise_scheduler,
                             interval_num=interval_num,
+                            reflect=reflect,
                         )
                         sz = torch.numel(adj_t)
                         target_loss = (
@@ -180,7 +194,7 @@ def copaint(
 
                     e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
                     adj_t = predict_xnext(
-                        config, noise_scheduler, e0, adj_t, adj_mask, t
+                        config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                     )
 
                 # time-travel (forward diffusion)
@@ -223,7 +237,12 @@ def repaint(
     batch_size = len(sizes)
     sqrt_2 = 2**0.5
 
-    adj_t, adj_mask = init_xT(config, batch_size, sizes, accelerator)
+    reflect = config.reflect
+    zero_diagonal = config.zero.diagonal
+
+    adj_t, adj_mask = init_xT(
+        config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
+    )
 
     T = noise_scheduler.timesteps[0].item()
     time_pairs = list(
@@ -258,7 +277,7 @@ def repaint(
                             config, model, adj_t, time, num_timesteps, adj_mask
                         )
                     adj_t = predict_xnext(
-                        config, noise_scheduler, e0, adj_t, adj_mask, t
+                        config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                     )
 
                     noise = torch.randn(target_adj.shape, device=accelerator.device)
@@ -278,6 +297,7 @@ def repaint(
                             mask=adj_mask,
                             scheduler=noise_scheduler,
                             interval_num=1,
+                            reflect=reflect,
                         )
                         sz = torch.numel(adj_t)
                         target_loss = (

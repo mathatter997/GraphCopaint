@@ -44,3 +44,5 @@ class EgoConfig:
     beta_end = 0.02
 
     data_format = 'graph'
+    reflect=True
+    zero_diagonal=True

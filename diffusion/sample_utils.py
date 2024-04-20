@@ -94,14 +94,18 @@ def get_edge_index(max_nodes, n=1):
     return edge_index.t().contiguous()
 
 
-def pred_x0(et, xt, t, mask, scheduler, interval_num):
+def reflect_pred(x0, xt, mask):
     sqrt_2 = 2**0.5
+    res = x0 - xt
+    res = (res + res.transpose(-1, -2)) / sqrt_2
+    res = res * mask
+    x0 = xt + res
+
+def pred_x0(et, xt, t, mask, scheduler, interval_num, reflect=True):
     if interval_num == 1:
         x0 = scheduler.step(et, t, xt).pred_original_sample
-        res = x0 - xt
-        res = (res + res.transpose(-1, -2)) / sqrt_2
-        res = res * mask
-        x0 = xt + res
+        if reflect:
+            x0 = reflect_pred(x0, xt, mask)
     else:
         if t == 0:
             return xt
@@ -143,10 +147,8 @@ def pred_x0(et, xt, t, mask, scheduler, interval_num):
                 alpha_prod_t_next ** (0.5) * pred_original_sample
                 + pred_sample_direction
             )
-            res = xnext - xt
-            res = (res + res.transpose(-1, -2)) / sqrt_2
-            res = res * mask
-            xnext = xt + res
+            if reflect:
+                xnext = reflect_pred(xnext, xt, mask)
         x0 = xnext
     return x0
 
@@ -166,17 +168,15 @@ def predict_e0(config, model, adj_t, time, num_timesteps, adj_mask):
     return e0
 
 
-def predict_xnext(config, noise_scheduler, e0, xt, mask, t):
-    sqrt_2 = 2 ** 0.5
+def predict_xnext(config, noise_scheduler, e0, xt, mask, t, reflect=True):
     if config.sampler == "vpsde":
         xnext, _ = noise_scheduler.step_pred(score=e0, t=t, x=xt)
     else:
         xnext = noise_scheduler.step(e0, t, xt).prev_sample
-    res = xnext - xt
-    res = (res + res.transpose(-1, -2)) / sqrt_2
-    res = res * mask
-    xt = xt + res
-    return xt
+    
+    if reflect:
+        xnext = reflect_pred(xnext, xt, mask)
+    return xnext
 
 
 def time_travel_fn(
@@ -188,13 +188,13 @@ def time_travel_fn(
     cur_t,
     optimize_before_time_travel,
 ):
-    sqrt_2 = 2**0.5
-
     if optimize_before_time_travel:
         pass
+    sqrt_2 = 2**0.5
     noise = torch.randn(adj_t.shape, device=accelerator.device)
     noise = noise + noise.transpose(-1, -2)
     noise = noise * adj_mask / sqrt_2
+
     alphas_cumprod = noise_scheduler.alphas_cumprod.to(
         dtype=adj_t.dtype, device=accelerator.device
     )
@@ -235,6 +235,7 @@ def optimize_xt(
     lr_xt,
     use_adaptive_lr_xt,
     num_timesteps,
+    reflect=True,
 ):
     time = torch.full((batch_size,), t.item(), device=accelerator.device)
     origin_adj = adj_t.clone().detach()
@@ -247,6 +248,7 @@ def optimize_xt(
             mask=adj_mask,
             scheduler=noise_scheduler,
             interval_num=interval_num,
+            reflect=reflect,
         )
         loss = loss_fn(target_adj, adj_0, target_mask) + coef_xt_reg * reg_fn(
             origin_adj, adj_t
@@ -255,7 +257,8 @@ def optimize_xt(
         adj_t_grad = torch.autograd.grad(
             loss, adj_t, retain_graph=False, create_graph=False
         )[0].detach()
-        adj_t_grad = (adj_t_grad + adj_t_grad.transpose(-1, -2)) / 2
+        if reflect:
+            adj_t_grad = (adj_t_grad + adj_t_grad.transpose(-1, -2)) / 2
         adj_t_grad = adj_t_grad * adj_mask
         new_adj_t = adj_t - lr_xt * adj_t_grad * loss_norm
         # if new_x doesn't improve loss
@@ -271,6 +274,7 @@ def optimize_xt(
                     mask=adj_mask,
                     scheduler=noise_scheduler,
                     interval_num=interval_num,
+                    reflect=reflect,
                 )
                 new_loss = loss_fn(
                     target_adj, adj_0, target_mask
@@ -289,17 +293,21 @@ def optimize_xt(
             torch.cuda.empty_cache()
     return adj_t
 
-def init_xT(config, batch_size, sizes, accelerator):
+def init_xT(config, batch_size, sizes, accelerator, zero_diagonal=True):
     sqrt_2 = 2 ** 0.5
     adj_shape = (batch_size, 1, config.max_n_nodes, config.max_n_nodes)
     adj_mask = torch.ones(adj_shape, device=accelerator.device)
-    adj_mask = torch.tril(adj_mask, diagonal=-1)
-    for k, size in enumerate(sizes):
-        adj_mask[k, :, size:] = 0
-    adj_mask = adj_mask + adj_mask.transpose(-1, -2)
+    if zero_diagonal:
+        adj_mask = torch.tril(adj_mask, diagonal=-1)
+        for k, size in enumerate(sizes):
+            adj_mask[k, :, size:] = 0
+        adj_mask = adj_mask + adj_mask.transpose(-1, -2)
+    else:
+        for k, size in enumerate(sizes):
+            adj_mask[k, :, size:] = 0
+            adj_mask[k, :, :, size:] = 0
     adj_t = torch.randn(adj_shape, device=accelerator.device)
     adj_t = torch.tril(adj_t, -1)
     adj_t = (adj_t + adj_t.transpose(-1, -2)) / sqrt_2
     adj_t = adj_t * adj_mask
-
     return adj_t, adj_mask

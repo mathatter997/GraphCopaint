@@ -44,6 +44,8 @@ class CommunitySmallConfig:
     beta_end = 0.005
     
     data_format = 'graph'
+    reflect=True
+    zero_diagonal=True
 
 
 @dataclass
@@ -77,3 +79,5 @@ class CommunitySmallSmoothConfig:
     beta_end = 0.005
 
     data_format = 'pixel'
+    reflect=True
+    zero_diagonal=True
