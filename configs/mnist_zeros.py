@@ -32,5 +32,5 @@ class MnistZerosConfig:
     beta_end = 0.005
 
     data_format = 'pixel'
-    reflect=True
+    reflect=False
     zero_diagonal=False
