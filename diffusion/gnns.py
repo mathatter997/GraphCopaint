@@ -199,20 +199,25 @@ class ScoreNetworkTest_eigen(torch.nn.Module):
         # self.final = MLP(num_layers=3, input_dim=max_node_num, hidden_dim=2*self.fdim, output_dim=self.nfeat,
         #                     use_bn=False, activate_func=F.elu)
 
-        self.final_with_eigen = MLP(num_layers=3, input_dim= 2 * self.nf, hidden_dim= 4 * self.nf, output_dim=self.nf//2,
-                         use_bn=False, activate_func=nn.SiLU())
+        # self.final_with_eigen = MLP(num_layers=3, input_dim= 2 * self.nf, hidden_dim= 4 * self.nf, output_dim=self.nf//2,
+        #                  use_bn=False, activate_func=nn.SiLU())
         
        
-        modules.append(nn.Conv1d(1, self.nf // 2, kernel_size=1, 
-                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
-        modules.append(nn.Conv1d(self.nf // 2, self.nf // 2, kernel_size=1, 
-                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
+        # modules.append(nn.Conv1d(1, self.nf // 2, kernel_size=1, 
+        #           stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
+        # modules.append(nn.Conv1d(self.nf // 2, self.nf // 2, kernel_size=1, 
+        #           stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
         
-        modules.append(nn.Conv1d(self.nf // 2, self.nf // 2, kernel_size=1, 
-                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
-        modules.append(nn.Conv1d(self.nf // 2, 1, kernel_size=1, 
-                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
+        # modules.append(nn.Conv1d(self.nf // 2, self.nf // 2, kernel_size=1, 
+        #           stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
+        # modules.append(nn.Conv1d(self.nf // 2, 1, kernel_size=1, 
+        #           stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'))
 
+        # modules.append(nn.Linear(self.nf // 2, self.nf // 2))
+        # modules.append(nn.Linear(self.nf // 2, max_node_num))
+        self.final_with_eigen = MLP(num_layers=3, input_dim= 2 * self.nf, hidden_dim= 4 * self.nf, output_dim=self.nf // 2,
+                         use_bn=False, activate_func=nn.SiLU())
+        
         modules.append(nn.Linear(self.nf // 2, self.nf // 2))
         modules.append(nn.Linear(self.nf // 2, max_node_num))
         self.emb_modules = nn.ModuleList(modules)
@@ -236,21 +241,25 @@ class ScoreNetworkTest_eigen(torch.nn.Module):
         la_emb = self.emb_modules[m_idx](la_emb)
         m_idx += 1
         emb = la_emb + temb
-        emb = emb.unsqueeze(1)
-        emb = self.emb_modules[m_idx](emb)
-        m_idx += 1
-        emb = self.emb_modules[m_idx](emb)
-        m_idx += 1
+        # emb = emb.unsqueeze(1)
+        # emb = self.emb_modules[m_idx](emb)
+        # m_idx += 1
+        # emb = self.emb_modules[m_idx](emb)
+        # m_idx += 1
 
         emb = self.final_with_eigen(emb)
         emb = self.emb_modules[m_idx](emb)
         m_idx += 1
         emb = self.emb_modules[m_idx](emb)
         m_idx += 1
-        emb = emb.squeeze(1)
-        emb = self.emb_modules[m_idx](emb)
-        m_idx += 1
-        emb = self.emb_modules[m_idx](emb)
+        # emb = self.emb_modules[m_idx](emb)
+        # m_idx += 1
+        # emb = self.emb_modules[m_idx](emb)
+        # m_idx += 1
+        # emb = emb.squeeze(1)
+        # emb = self.emb_modules[m_idx](emb)
+        # m_idx += 1
+        # emb = self.emb_modules[m_idx](emb)
 
         # x_list = [x]
         # for _ in range(self.depth):
