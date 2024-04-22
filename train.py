@@ -11,6 +11,7 @@ from data.data_loader import load_data
 from torch_geometric.loader import DataLoader
 from data.dataset import get_dataset
 from diffusion.pgsn import PGSN
+from diffusion.eigen_nn import EigenNN
 from diffusion.ema import ExponentialMovingAverage
 from diffusers.optimization import (
     get_constant_schedule,
@@ -20,6 +21,7 @@ from configs.mnist_zeros import MnistZerosConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
+from diffusion.utils import dense_adj, init_eigen
 
 
 @click.command()
@@ -64,10 +66,24 @@ def train_ddpm(
         train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
-        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf) - 1
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         ) 
+    elif config.data_format == 'eigen':
+        train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
+            config.data_filepath, config.data_name, device=accelerator.device, split=split
+        )
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf) - 1
+        def scale_data(x):
+            return 1 * x
+        train_dataloader = []
+        for i in range(len(train_dataset)):
+            adj, _ = dense_adj(train_dataset[i], config.max_n_nodes, scale_data)
+            adj = adj.squeeze(0, 1)
+            adj, x, la, u, flag = init_eigen(adj, config.max_feat_num, config.max_n_nodes, train_dataset[i].num_nodes)
+            train_dataloader.append((adj, x, la, u, flag))
+        train_dataloader = DataLoader(train_dataloader, batch_size=config.train_batch_size, shuffle=True)
     elif config.data_format == 'pixel':
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
@@ -76,8 +92,7 @@ def train_ddpm(
         train_dataloader = DataLoader(
             train_dataset, batch_size=config.train_batch_size, shuffle=True
         )
-
-    if config.data_format == 'graph':
+    if config.model == "pgsn":
         model = PGSN(
             max_node=max_n_nodes,
             nf=config.nf,
@@ -90,7 +105,21 @@ def train_ddpm(
             dropout=config.dropout,
             attn_clamp=config.attn_clamp
         )
-    elif config.data_format == 'pixel':
+    elif config.model == 'eigen':
+        model = EigenNN(
+            max_feat_num=config.max_feat_num,
+            nhid=config.nhid,
+            max_node_num=config.max_node_num,
+            num_layers=config.num_layers,
+            num_linears=config.num_linears,
+            c_init=config.c_init,
+            c_hid=config.c_hid,
+            c_final=config.c_final,
+            adim=config.adim,
+            depth=config.depth,
+            num_heads=config.num_heads,
+            conv=config.conv,)
+    elif config.model == 'unet':
         model = UNet2DModel(
             sample_size=(max_n_nodes, max_n_nodes),
             in_channels=1,

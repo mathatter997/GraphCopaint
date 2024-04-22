@@ -177,8 +177,15 @@
 #     --masked_output_path data/dataset/ablation/masked_${data_name}_${inpainter}_a1_0.json \
 #     --log_x0_predictions True
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1 \
- --sampler ddim --log_x0_predictions True \
- --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
- --scheduler_path models/Ego_small/scheduler_config.json \
- --output_path data/dataset/output_ego_small_ddim.json
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 1 \
+#  --sampler ddim --log_x0_predictions True \
+#  --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddim.json
+
+
+CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --use_ema False --num_samples 1000 \
+ --sampler ddpm --log_x0_predictions False \
+ --checkpoint_path models/Community_small/gnn/checkpoint_epoch_5000_t1000_eigen.pth \
+ --scheduler_path models/Community_small/scheduler_config.json \
+ --output_path data/dataset/output_com_small_eigen_test_ddpm.json

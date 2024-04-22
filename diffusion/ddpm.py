@@ -7,6 +7,7 @@ from .utils import dense_adj
 from tqdm.auto import tqdm
 from .ema import ExponentialMovingAverage
 from .sample_utils import predict_e0
+from .utils import mask_adjs, mask_x
 
 def train_loop(
     config,
@@ -65,10 +66,13 @@ def train_loop(
             elif config.data_format == 'pixel':
                 adj, adj_mask = batch
                 adj = scale_data(adj) * adj_mask
-            edge_noise = torch.randn(adj.shape, device=accelerator.device)
-            # make symmetric 
-            edge_noise = edge_noise + edge_noise.transpose(-1, -2)
-            edge_noise = edge_noise * adj_mask / sqrt_2
+            elif config.data_format == 'eigen':
+                adj, x, la, u, flags = batch
+                u_T = u.transpose(-1, - 2)
+                adj = scale_data(adj)
+                adj = mask_adjs(adj, flags)
+                x = mask_x(x, flags)
+            
             timesteps = torch.randint(
                 0,
                 noise_scheduler.config.num_train_timesteps,
@@ -76,15 +80,31 @@ def train_loop(
                 device=accelerator.device,
                 dtype=torch.int64,
             )
+            if config.data_format == 'eigen':
+                la_noise = torch.randn(la.shape, device=accelerator.device)
+                x_noise = torch.randn(x.shape, device=accelerator.device)
+                noised_la = noise_scheduler.add_noise(la, la_noise, timesteps)
+                noised_x = noise_scheduler.add_noise(x, x_noise, timesteps)
+                noised_adj = torch.bmm(torch.bmm(u, torch.diag_embed(noised_la)),u_T)
+            else: 
+                edge_noise = torch.randn(adj.shape, device=accelerator.device)
+                # make symmetric 
+                edge_noise = edge_noise + edge_noise.transpose(-1, -2)
+                edge_noise = edge_noise * adj_mask / sqrt_2
+                noised_edges = noise_scheduler.add_noise(adj, edge_noise, timesteps)
+                noised_edges = noised_edges * adj_mask
 
-            # Add noise to the clean images according to the noise magnitude at each timestep
-            # (this is the forward diffusion process)
-            noisy_edges = noise_scheduler.add_noise(adj, edge_noise, timesteps)
-            noisy_edges = noisy_edges * adj_mask
             with accelerator.accumulate(model):
                 # Predict the noise residual
-                e0 = predict_e0(config, model, noisy_edges, timesteps, -1, adj_mask)
-                loss = F.mse_loss(e0, edge_noise)
+                if config.data_format == 'eigen':
+                    ex0, ela0 = model(noised_x, noised_adj, flags, u, noised_la, timesteps)
+                    ex0, ela0 = ex0, ela0
+                    x_loss = F.mse_loss(ex0, x_noise) 
+                    la_loss = F.mse_loss(ela0, la_noise)
+                    loss = la_loss
+                else:
+                    e0 = predict_e0(config, model, noised_edges, timesteps, -1, adj_mask)
+                    loss = F.mse_loss(e0, edge_noise)
 
                 accelerator.backward(loss)
                 accelerator.clip_grad_norm_(model.parameters(), 1.0)

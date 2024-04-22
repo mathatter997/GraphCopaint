@@ -6,6 +6,8 @@ import numpy as np
 import networkx as nx
 from accelerate import Accelerator
 from diffusion.pgsn import PGSN
+from diffusion.eigen_nn import EigenNN
+from diffusion.utils import dense_adj, init_eigen
 from torch_geometric.utils import to_dense_adj
 from diffusers import DDIMScheduler,DDPMScheduler,UNet2DModel
 from vpsde import ScoreSdeVpScheduler
@@ -18,6 +20,7 @@ from configs.mnist_zeros import MnistZerosConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
+import random
 
 @click.command()
 @click.option(
@@ -112,13 +115,28 @@ def inference(
         project_dir=os.path.join(config.output_dir, "logs"),
         cpu=cpu,
     )
-
     split = 0.8
     if config.data_format == 'graph':
         targets, _, _, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
         config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+    elif config.data_format == 'eigen':
+        train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
+            config.data_filepath, config.data_name, device=accelerator.device, split=split
+        )
+        config.max_n_nodes = max_n_nodes = len(n_node_pmf) - 1
+        def scale_data(x):
+            return 2 * x - 1
+        targets = []
+        u_mats = {i : [] for i in range(max_n_nodes + 1)}
+        for i in range(len(train_dataset)):
+            adj, _ = dense_adj(train_dataset[i], config.max_n_nodes, scale_data)
+            adj = adj.squeeze(0, 1)
+            adj, x, la, u, flag = init_eigen(adj, config.max_feat_num, config.max_n_nodes, train_dataset[i].num_nodes)
+            targets.append(adj)
+            u_mats[train_dataset[i].num_nodes].append(u)
+        
     elif config.data_format == 'pixel':
         dataset = torch.load(f'{config.data_filepath}raw/{config.data_name}.pth')
         num_train = int(len(dataset) * split)
@@ -186,9 +204,17 @@ def inference(
             targets = torch.vstack(targets).to(device=accelerator.device)
                         
     else:
+        u_list = None
         sizes = torch.multinomial(
             torch.Tensor(n_node_pmf), num_samples, replacement=True
         )
+        if config.data_format == 'eigen':
+            u_list = []
+            for size in sizes:
+                u_list.append(random.choice(u_mats[size.item()]).unsqueeze(0))
+            u_list = torch.vstack(u_list)
+
+
     config.sampler = sampler 
     if sampler == "ddim":
         noise_scheduler = DDIMScheduler.from_pretrained(
@@ -217,6 +243,20 @@ def inference(
             dropout=config.dropout,
             attn_clamp=config.attn_clamp,
         )
+    elif config.data_format == 'eigen':
+        model = EigenNN(
+            max_feat_num=config.max_feat_num,
+            nhid=config.nhid,
+            max_node_num=config.max_node_num,
+            num_layers=config.num_layers,
+            num_linears=config.num_linears,
+            c_init=config.c_init,
+            c_hid=config.c_hid,
+            c_final=config.c_final,
+            adim=config.adim,
+            depth=config.depth,
+            num_heads=config.num_heads,
+            conv=config.conv,)
     elif config.data_format == 'pixel':
         model = UNet2DModel(
             sample_size=(max_n_nodes, max_n_nodes),
@@ -234,12 +274,19 @@ def inference(
         ema.copy_to(model.parameters())
     else:
         model.load_state_dict(checkpoint["model_state_dict"])
+        # model.layers[0].load_state_dict(checkpoint["x_state_dict"])
+        # model.layers[1].load_state_dict(checkpoint["adj_state_dict"])
+
     model = accelerator.prepare(model)
     model.eval()
     pred_adj_list = []
     tstart = time.time()
     for i in range(0, num_samples, config.eval_batch_size):
         batch_sz = min(config.eval_batch_size, num_samples - i)
+        if u_list is None:
+            u_batch = None
+        else:
+            u_batch = u_list[i:i+batch_sz]
         if inpainter == 'none':
             edges = sample(
                 config=config,
@@ -247,6 +294,7 @@ def inference(
                 noise_scheduler=noise_scheduler,
                 num_inference_steps=num_timesteps,
                 sizes=sizes[i:i+batch_sz],
+                u=u_batch,
                 accelerator=accelerator,
                 log_x0_predictions=log_x0_predictions,
             )

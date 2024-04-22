@@ -18,7 +18,7 @@ def plot_loss_and_samples(config, adj_0s, size):
     plt.ylabel('Average Edge Weight Euclidean Distance')
     plt.plot(time, losses)
     plt.xticks([1000, 800, 600, 400, 200, 0])  # Specify x-axis grid lines
-    plt.yticks([.07, .06, .05, .04, 0.03, .02, .01, 0])
+    # plt.yticks([.07, .06, .05, .04, 0.03, .02, .01, 0])
     plt.savefig('data/sample_losses.png')
     plt.clf()
     times = np.array([1000, 800, 600, 400, 200, 1]) - 1

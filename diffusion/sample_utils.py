@@ -179,7 +179,6 @@ def predict_xnext(config, noise_scheduler, e0, xt, mask, t, reflect=True):
         xnext = reflect_pred(xnext, xt, mask)
     return xnext
 
-
 def time_travel_fn(
     adj_t,
     adj_mask,

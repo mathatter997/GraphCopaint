@@ -10,6 +10,7 @@ from .sample_utils import (
     optimize_xt,
     init_xT,
 )
+from .utils import mask_adjs, mask_x
 from evaluation.dataviz_utils import plot_loss_and_samples
 import wandb
 
@@ -21,6 +22,7 @@ def sample(
     accelerator,
     num_inference_steps=1000,
     sizes=None,
+    u=None,
     log_x0_predictions=False,
 ):
     model.eval()
@@ -29,31 +31,63 @@ def sample(
     num_timesteps = len(noise_scheduler.timesteps)
     reflect = config.reflect
     zero_diagonal = config.zero_diagonal
-    adj_t, adj_mask = init_xT(
-        config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
-    )
+    if config.data_format == 'eigen':
+        x_t = torch.randn((batch_size, config.max_n_nodes, config.max_feat_num), device=accelerator.device)
+        la_t =  torch.randn((batch_size, config.max_n_nodes), device=accelerator.device)
+        u_T = u.transpose(-1, -2)
+        adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+        flags = torch.zeros(batch_size, config.max_n_nodes, device=accelerator.device)
+        for i in range(batch_size):
+            flags[i,:sizes[i]] = 1
+    else:
+        adj_t, adj_mask = init_xT(
+            config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
+        )
 
     if log_x0_predictions:
         adj_0s = []
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
-            e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-            adj_t = predict_xnext(
-                config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
-            )
-
-            if log_x0_predictions:
-                adj_0 = pred_x0(
-                    et=e0,
-                    xt=adj_t,
-                    t=t,
-                    mask=adj_mask,
-                    scheduler=noise_scheduler,
-                    interval_num=1,
-                    reflect=reflect,
+            if config.data_format == 'eigen':
+                ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+                x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
+                la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
+                if t == 0:
+                    adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+                    adj_t = mask_adjs(adj_t, flags)
+                adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+                x_t = mask_x(x_t, flags)
+                adj_t = mask_adjs(adj_t, flags)
+                if log_x0_predictions:
+                    la_0 = pred_x0(
+                        et=ela0,
+                        xt=la_t,
+                        t=t,
+                        mask=None,
+                        scheduler=noise_scheduler,
+                        interval_num=1,
+                        reflect=False,
+                    )
+                    adj_0 = torch.bmm(u, torch.bmm(torch.diag_embed(la_0), u_T))
+                    adj_0s.append(adj_0.cpu().reshape(1, 1, config.max_n_nodes, config.max_n_nodes))
+            else:
+                e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
+                adj_t = predict_xnext(
+                    config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                 )
-                adj_0s.append(adj_0.cpu())
+
+                if log_x0_predictions:
+                    adj_0 = pred_x0(
+                        et=e0,
+                        xt=adj_t,
+                        t=t,
+                        mask=adj_mask,
+                        scheduler=noise_scheduler,
+                        interval_num=1,
+                        reflect=reflect,
+                    )
+                    adj_0s.append(adj_0.cpu())
     if log_x0_predictions:
         if len(sizes) == 1:
             size = sizes[0]

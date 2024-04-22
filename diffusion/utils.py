@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch_scatter import scatter
 _MODELS = {}
 
@@ -213,4 +214,43 @@ def dense_adj(graph_data, max_num_nodes, scaler=None, dequantization=False):
     adj_mask = adj_mask + adj_mask.transpose(-1, -2)
 
     return adj, adj_mask[:, None, :, :]
+
+
+# -------- Mask batch of node features with 0-1 flags tensor --------
+def mask_x(x, flags):
+
+    if flags is None:
+        flags = torch.ones((x.shape[0], x.shape[1]), device=x.device)
+    return x * flags[:,:,None]
+
+
+# -------- Mask batch of adjacency matrices with 0-1 flags tensor --------
+def mask_adjs(adjs, flags):
+    """
+    :param adjs:  B x N x N or B x C x N x N
+    :param flags: B x N
+    :return:
+    """
+    # print("in mask_adjs")
+    # print("flags:", flags.shape)
+    # print("adjs:", adjs.shape)
+    # for i in range(flags.shape[0]):
+    #     print("flags[i]:",flags[i])
+    if flags is None:
+        flags = torch.ones((adjs.shape[0], adjs.shape[-1]), device=adjs.device)
+
+    if len(adjs.shape) == 4:
+        flags = flags.unsqueeze(1)  # B x 1 x N
+    adjs = adjs * flags.unsqueeze(-1)
+    adjs = adjs * flags.unsqueeze(-2)
+    return adjs
+
+def init_eigen(adj, max_feat_num, max_num_nodes, num_nodes):
+    flag = torch.zeros(max_num_nodes, device=adj.device)
+    flag[:num_nodes] = 1
+    x = torch.sum(adj > 0, dim=-1)
+    x = F.one_hot(x, max_feat_num)
+    x = x * flag[:, None]
+    la, u = torch.linalg.eigh(adj)
+    return adj, x, la, u, flag
 

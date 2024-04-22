@@ -14,10 +14,12 @@
 #     --inpaint_loss True --mask_path 'data/dataset/mask_com_small_copaint.json' \
 #     --masked_target_path 'data/dataset/masked_com_small_copaint.json'
 
-python evaluate.py --dataset 'Community_small' --pred_file 'data/dataset/output_com_small_copaint.json' \
-    --inpaint_loss True --mask_path 'data/dataset/mask_com_small_copaint.json' \
-    --masked_target_path 'data/dataset/masked_com_small_copaint.json'
+# python evaluate.py --dataset 'Community_small' --pred_file 'data/dataset/output_com_small_copaint.json' \
+#     --inpaint_loss True --mask_path 'data/dataset/mask_com_small_copaint.json' \
+#     --masked_target_path 'data/dataset/masked_com_small_copaint.json'
 
 # python evaluate.py --dataset 'Community_small' --pred_file 'data/dataset/output2_com_small.json' \
     # --inpaint_loss True --mask_path 'data/dataset/mask_com_small_copaint.json' \
     # --masked_target_path 'data/dataset/masked_com_small_copaint.json'
+
+python evaluate.py --dataset 'Community_small' --pred_file 'data/dataset/output_com_small_eigen_test_ddim.json'
