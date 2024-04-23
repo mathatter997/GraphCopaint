@@ -11,7 +11,7 @@ from .sample_utils import (
     init_xT,
 )
 from .utils import mask_adjs, mask_x
-from evaluation.dataviz_utils import plot_loss_and_samples
+from evaluation.dataviz_utils import plot_loss_and_samples, plot_diffs
 import wandb
 
 
@@ -99,8 +99,8 @@ def sample(
                     adj_0s.append(adj_0.cpu())
     if log_x0_predictions:
         if len(sizes) == 1:
-            print(len(diffs))
             size = sizes[0]
+            plot_diffs(config, diffs, size)
             plot_loss_and_samples(config, adj_0s, size)
     return adj_t
 
@@ -130,6 +130,7 @@ def copaint(
     target_adj=None,
     log_x0_predictions=False,
     lr_xt_path=None,
+    opt_num_path=None,
 ):
     model.eval()
     batch_size = len(sizes)
@@ -161,6 +162,13 @@ def copaint(
             lr_x = json.load(f)
             lr_x = torch.tensor(lr_x)
             lr_x = torch.flip(lr_x, [0])
+    if opt_num_path is None:
+        num_iteration_optimize_x = torch.full(num_inference_steps, type=torch.int32)
+    else:
+        with open(opt_num_path, "r") as f:
+            num_iteration_optimize_x = json.load(f)
+            num_iteration_optimize_x = torch.tensor(num_iteration_optimize_x)
+            num_iteration_optimize_x = torch.flip(num_iteration_optimize_x, [0])
     coef_x_reg = coef_xt_reg * torch.pow(coef_xt_reg_decay, torch.arange(T + 1))
     coef_x_reg = torch.flip(coef_x_reg, [0])
     if log_x0_predictions:
@@ -211,7 +219,7 @@ def copaint(
                         target_mask,
                         batch_size,
                         accelerator,
-                        num_iteration_optimize_xt,
+                        num_iteration_optimize_x[t_],
                         interval_num,
                         loss_fn,
                         coef_xt_reg,
@@ -267,8 +275,6 @@ def copaint(
                         optimize_before_time_travel,
                     )
 
-        # lr_xt *= lr_xt_decay
-        # coef_xt_reg *= coef_xt_reg_decay
     adj_t = adj_t * adj_mask
     return adj_t
 

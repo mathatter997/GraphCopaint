@@ -69,6 +69,7 @@ import random
 @click.option("--use_adaptive_lr_xt", default=True)
 @click.option("--max_n_nodes", default=None, type=int)
 @click.option("--lr_xt_path",default=None)
+@click.option("--opt_num_path",default=None)
 def inference(
     config_type,
     checkpoint_path,
@@ -97,6 +98,7 @@ def inference(
     coef_xt_reg_decay,
     use_adaptive_lr_xt,
     lr_xt_path,
+    opt_num_path,
     max_n_nodes,
 ):
     if config_type == "community_small":
@@ -289,7 +291,6 @@ def inference(
         ema.load_state_dict(checkpoint["ema_state_dict"])
         # ema.load_state_dict(checkpoint["ema"])
         ema.copy_to(model.parameters())
-
     else:
         # model.load_state_dict(checkpoint["model_state_dict"])
         model.layers[0].load_state_dict(checkpoint["x_state_dict"])
@@ -340,6 +341,7 @@ def inference(
                 coef_xt_reg_decay=coef_xt_reg_decay,
                 use_adaptive_lr_xt=use_adaptive_lr_xt,
                 lr_xt_path=lr_xt_path,
+                opt_num_path=opt_num_path,
             )
         elif inpainter == 'repaint':
             edges = repaint(
