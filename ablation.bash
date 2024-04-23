@@ -21,24 +21,30 @@ reg_mode="naive_square"
  # --lr_xt 0.0025 --lr_xt_decay 1.01 \
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
-lr_xt_paths=(lr_x/exp_init25_decay1.0.json \
-            lr_x/exp_init25_decay1.002.json \
-            lr_x/exp_init25_decay1.004.json \
-            lr_x/exp_init25_decay1.006.json \
-            lr_x/relu_init25_start100_xT50.json \
-            lr_x/relu_init25_start200_xT50.json
+# lr_xt_paths=(lr_x/exp_init25_decay1.0.json \
+#             lr_x/exp_init25_decay1.002.json \
+#             lr_x/exp_init25_decay1.004.json \
+#             lr_x/exp_init25_decay1.006.json \
+#             lr_x/relu_init25_start100_xT50.json \
+#             lr_x/relu_init25_start200_xT50.json
+#             )
+lr_xt_paths=(lr_x/relu_init25_start100_xT200.json \
+            lr_x/relu_init25_start200_xT200.json \
+            lr_x/relu_init25_start100_xT400.json \
+            lr_x/relu_init25_start200_xT400.json \
             )
+
 for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
     CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 32 \
         --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
         --lr_xt_path ${lr_xt_paths[$i]}\
         --loss_mode $loss_mode --reg_mode $reg_mode \
         --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
-        --checkpoint_path models/Community_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+        --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
         --scheduler_path models/Community_small/scheduler_config.json \
-        --output_path data/dataset/ablation/output_com_small_copaint_a10_${i}.json \
-        --mask_path data/dataset/ablation/mask_com_small_copaint_a10_${i}.json \
-        --masked_output_path data/dataset/ablation/masked_com_small_copaint_a10_${i}.json \
+        --output_path data/dataset/ablation/output_com_small_copaint_a10_${i+6}.json \
+        --mask_path data/dataset/ablation/mask_com_small_copaint_a10_${i+6}.json \
+        --masked_output_path data/dataset/ablation/masked_com_small_copaint_a10_${i+6}.json \
         --log_x0_predictions False
 done
 
