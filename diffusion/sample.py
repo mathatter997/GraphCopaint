@@ -163,7 +163,7 @@ def copaint(
             lr_x = torch.tensor(lr_x)
             lr_x = torch.flip(lr_x, [0])
     if opt_num_path is None:
-        num_iteration_optimize_x = torch.full(num_inference_steps, type=torch.int32)
+        num_iteration_optimize_x = torch.full((num_inference_steps,), num_iteration_optimize_xt,type=torch.int32)
     else:
         with open(opt_num_path, "r") as f:
             num_iteration_optimize_x = json.load(f)
