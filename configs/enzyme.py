@@ -46,3 +46,5 @@ class EnzymeConfig:
     data_format = 'graph'
     reflect=True
     zero_diagonal=True
+
+    max_feat_num = 10

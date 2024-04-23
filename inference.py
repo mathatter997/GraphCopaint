@@ -67,6 +67,8 @@ import random
 @click.option("--coef_xt_reg", default=0.01)
 @click.option("--coef_xt_reg_decay", default=1.0)
 @click.option("--use_adaptive_lr_xt", default=True)
+@click.option("--max_n_nodes", default=None, type=int)
+@click.option("--lr_xt_path",default=None)
 def inference(
     config_type,
     checkpoint_path,
@@ -94,6 +96,8 @@ def inference(
     coef_xt_reg,
     coef_xt_reg_decay,
     use_adaptive_lr_xt,
+    lr_xt_path,
+    max_n_nodes,
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
@@ -120,12 +124,18 @@ def inference(
         targets, _, _, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
-        config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        if not max_n_nodes:
+            config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        else:
+            config.max_n_nodes = max_n_nodes
     elif config.data_format == 'eigen':
         train_dataset, eval_dataset, test_dataset, n_node_pmf = get_dataset(
             config.data_filepath, config.data_name, device=accelerator.device, split=split
         )
-        config.max_n_nodes = max_n_nodes = len(n_node_pmf) - 1
+        if not max_n_nodes:
+            config.max_n_nodes = max_n_nodes = len(n_node_pmf)
+        else:
+            config.max_n_nodes = max_n_nodes
         def scale_data(x):
             return 2 * x - 1
         targets = []
@@ -148,8 +158,11 @@ def inference(
             n = int(torch.where(mask[0] == 1)[0][-1].item()) + 1
             n_node_pmf[n] += 1
         n_node_pmf /= np.sum(n_node_pmf)
-        config.max_n_nodes = max_n_nodes = 24
-
+        if not max_n_nodes:
+            config.max_n_nodes = max_n_nodes = 24
+        else:
+            config.max_n_nodes = max_n_nodes
+    u_list = None
     if inpainter != 'none':
         assert mask_path is not None and masked_output_path is not None
         all_batches = []
@@ -204,7 +217,6 @@ def inference(
             targets = torch.vstack(targets).to(device=accelerator.device)
                         
     else:
-        u_list = None
         sizes = torch.multinomial(
             torch.Tensor(n_node_pmf), num_samples, replacement=True
         )
@@ -213,7 +225,6 @@ def inference(
             for size in sizes:
                 u_list.append(random.choice(u_mats[size.item()]).unsqueeze(0))
             u_list = torch.vstack(u_list)
-
 
     config.sampler = sampler 
     if sampler == "ddim":
@@ -268,14 +279,21 @@ def inference(
     )
 
     if use_ema:
+        # ema_x = ExponentialMovingAverage(model.layers[0].parameters(), decay=0.9999)
+        # ema_adj = ExponentialMovingAverage(model.layers[1].parameters(), decay=0.9999)
+        # ema_x.load_state_dict(checkpoint["ema_x"])
+        # ema_adj.load_state_dict(checkpoint["ema_adj"])
+        # ema_x.copy_to(model.layers[0].parameters())
+        # ema_adj.copy_to(model.layers[1].parameters())
         ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
         ema.load_state_dict(checkpoint["ema_state_dict"])
         # ema.load_state_dict(checkpoint["ema"])
         ema.copy_to(model.parameters())
+
     else:
-        model.load_state_dict(checkpoint["model_state_dict"])
-        # model.layers[0].load_state_dict(checkpoint["x_state_dict"])
-        # model.layers[1].load_state_dict(checkpoint["adj_state_dict"])
+        # model.load_state_dict(checkpoint["model_state_dict"])
+        model.layers[0].load_state_dict(checkpoint["x_state_dict"])
+        model.layers[1].load_state_dict(checkpoint["adj_state_dict"])
 
     model = accelerator.prepare(model)
     model.eval()
@@ -321,6 +339,7 @@ def inference(
                 coef_xt_reg=coef_xt_reg,
                 coef_xt_reg_decay=coef_xt_reg_decay,
                 use_adaptive_lr_xt=use_adaptive_lr_xt,
+                lr_xt_path=lr_xt_path,
             )
         elif inpainter == 'repaint':
             edges = repaint(

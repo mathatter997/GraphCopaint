@@ -160,11 +160,15 @@ def predict_e0(config, model, adj_t, time, num_timesteps, adj_mask):
             e0 = model(adj_t, time * num_timesteps, mask=adj_mask)
         elif config.data_format == "pixel":
             e0 = model(adj_t, time * num_timesteps).sample * adj_mask
+        elif config.data_format == "eigen":
+            e0 = model(adj_t, time)
     else:
         if config.data_format == "graph":
             e0 = model(adj_t, time, mask=adj_mask)
         elif config.data_format == "pixel":
             e0 = model(adj_t, time).sample * adj_mask
+        elif config.data_format == "eigen":
+            e0 = model(adj_t, time)
 
     return e0
 

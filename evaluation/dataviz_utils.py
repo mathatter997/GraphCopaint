@@ -16,8 +16,8 @@ def plot_loss_and_samples(config, adj_0s, size):
     plt.grid(True, linestyle='--', linewidth=0.5, color='gray', which="both", axis="both")  # dashed lines, with width 0.5, and gray color
     plt.xlabel('Timestep')
     plt.ylabel('Average Edge Weight Euclidean Distance')
-    plt.plot(time, losses)
-    plt.xticks([1000, 800, 600, 400, 200, 0])  # Specify x-axis grid lines
+    plt.plot(time[800:], losses[800:])
+    # plt.xticks([1000, 800, 600, 400, 200, 0])  # Specify x-axis grid lines
     # plt.yticks([.07, .06, .05, .04, 0.03, .02, .01, 0])
     plt.savefig('data/sample_losses.png')
     plt.clf()

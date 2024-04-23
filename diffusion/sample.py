@@ -1,4 +1,4 @@
-import os
+import json
 import torch
 from .sample_utils import (
     get_loss_fn,
@@ -46,6 +46,7 @@ def sample(
 
     if log_x0_predictions:
         adj_0s = []
+        diffs = []
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
@@ -53,13 +54,18 @@ def sample(
                 ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
                 x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
                 la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
-                if t == 0:
-                    adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
-                    adj_t = mask_adjs(adj_t, flags)
+                
+                if log_x0_predictions:
+                    prev_adj_t = adj_t
                 adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
                 x_t = mask_x(x_t, flags)
                 adj_t = mask_adjs(adj_t, flags)
+                # la_t = torch.clamp(la_t, -4, 4)
+                # x_t = torch.clamp(x_t, -5, 5)
+
+                # print(torch.norm(adj_t), t)
                 if log_x0_predictions:
+                    diffs.append(torch.norm(adj_t - prev_adj_t))
                     la_0 = pred_x0(
                         et=ela0,
                         xt=la_t,
@@ -73,11 +79,14 @@ def sample(
                     adj_0s.append(adj_0.cpu().reshape(1, 1, config.max_n_nodes, config.max_n_nodes))
             else:
                 e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
+                if log_x0_predictions:
+                    prev_adj_t = adj_t
                 adj_t = predict_xnext(
                     config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                 )
 
                 if log_x0_predictions:
+                    diffs.append(torch.norm(adj_t - prev_adj_t))
                     adj_0 = pred_x0(
                         et=e0,
                         xt=adj_t,
@@ -90,6 +99,7 @@ def sample(
                     adj_0s.append(adj_0.cpu())
     if log_x0_predictions:
         if len(sizes) == 1:
+            print(len(diffs))
             size = sizes[0]
             plot_loss_and_samples(config, adj_0s, size)
     return adj_t
@@ -119,6 +129,7 @@ def copaint(
     target_mask=None,
     target_adj=None,
     log_x0_predictions=False,
+    lr_xt_path=None,
 ):
     model.eval()
     batch_size = len(sizes)
@@ -141,6 +152,17 @@ def copaint(
     )
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
+
+    if lr_xt_path is None:
+        lr_x = lr_xt * torch.pow(lr_xt_decay, torch.arange(T + 1))
+        lr_x = torch.flip(lr_x, [0])
+    else:
+        with open(lr_xt_path, "r") as f:
+            lr_x = json.load(f)
+            lr_x = torch.tensor(lr_x)
+            lr_x = torch.flip(lr_x, [0])
+    coef_x_reg = coef_xt_reg * torch.pow(coef_xt_reg_decay, torch.arange(T + 1))
+    coef_x_reg = torch.flip(coef_x_reg, [0])
     if log_x0_predictions:
         wandb.init(
             # set the wandb project where this run will be logged
@@ -161,6 +183,7 @@ def copaint(
                 "coef_xt_reg": coef_xt_reg,
                 "coef_xt_reg_decay": coef_xt_reg_decay,
                 "sampler": config.sampler,
+                "lr_xt_path": lr_xt_path,
             },
         )
     for prev_t, cur_t in time_pairs:
@@ -168,6 +191,8 @@ def copaint(
             # optimize x_t given x_0
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
+                    lr_xt = lr_x[t_]
+                    coef_xt_reg = coef_x_reg[t_]
                     model.eval()
                     t = torch.tensor(t_)
                     adj_t = adj_t * adj_mask
@@ -197,7 +222,6 @@ def copaint(
                         num_timesteps,
                         reflect=reflect,
                     )
-
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
                         e0 = predict_e0(
                             config, model, adj_t, time, num_timesteps, adj_mask
@@ -243,8 +267,8 @@ def copaint(
                         optimize_before_time_travel,
                     )
 
-        lr_xt *= lr_xt_decay
-        coef_xt_reg *= coef_xt_reg_decay
+        # lr_xt *= lr_xt_decay
+        # coef_xt_reg *= coef_xt_reg_decay
     adj_t = adj_t * adj_mask
     return adj_t
 

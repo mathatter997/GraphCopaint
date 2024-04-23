@@ -46,7 +46,7 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
     order = 1
 
     @register_to_config
-    def __init__(self, num_train_timesteps=1000, beta_min=0.1, beta_max=1, sampling_eps=1e-3):
+    def __init__(self, num_train_timesteps=1000, beta_min=0.1, beta_max=5, sampling_eps=1e-3):
         self.sigmas = None
         self.discrete_sigmas = None
         self.timesteps = torch.linspace(1, self.config.sampling_eps, num_train_timesteps)

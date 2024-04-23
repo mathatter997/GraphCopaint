@@ -6,7 +6,7 @@ class EgoSmallConfig:
     data_filepath = "data/dataset/"
     data_name = "Ego_small"
     train_batch_size = 32
-    eval_batch_size = 2  # how many to sample during evaluation
+    eval_batch_size = 32  # how many to sample during evaluation
     num_epochs = 400000
     start_epoch = 0
     gradient_accumulation_steps = 1
@@ -19,7 +19,9 @@ class EgoSmallConfig:
 
     output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
-    label = f"_t{train_timesteps}_psgn"
+    # model = 'pgsn'
+    model = 'eigen'
+    label = f"_t{train_timesteps}_{model}"
 
     push_to_hub = False  # whether to upload the saved model to the HF Hub
     hub_private_repo = False
@@ -43,6 +45,21 @@ class EgoSmallConfig:
     beta_start = 0.0001
     beta_end = 0.02
 
-    data_format = 'graph'
+    # data_format = 'graph'
+    data_format = 'eigen'
     reflect=True
     zero_diagonal=True
+
+    # eigen params
+    max_node_num = 18
+    max_feat_num = 17
+    conv = "GCN"
+    num_heads = 4
+    depth = 3
+    adim = 32
+    nhid = 32
+    num_layers = 5
+    num_linears = 2
+    c_init = 2
+    c_hid = 8
+    c_final = 4

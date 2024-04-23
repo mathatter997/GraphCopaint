@@ -98,8 +98,9 @@ def train_loop(
                 # Predict the noise residual
                 if config.data_format == 'eigen':
                     ex0, ela0 = model(noised_x, noised_adj, flags, u, noised_la, timesteps)
-                    ex0, ela0 = ex0, ela0
-                    x_loss = F.mse_loss(ex0, x_noise) 
+                    # ela0 = model(noised_x, noised_adj, flags, u, noised_la, timesteps)
+                    # ela0 = predict_e0(config, model, noised_la, timesteps, -1, None)
+                    # x_loss = F.mse_loss(ex0, x_noise) 
                     la_loss = F.mse_loss(ela0, la_noise)
                     loss = la_loss
                 else:

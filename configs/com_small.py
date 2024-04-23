@@ -11,15 +11,15 @@ class CommunitySmallConfig:
     start_epoch = 0
     gradient_accumulation_steps = 1
     learning_rate = 2e-5
-    save_model_epochs = 1000
+    save_model_epochs = 50000
     train_timesteps = 1000
     mixed_precision = "no"
     start = 0
     checkpoint_path = None
     output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
-    # model = 'pgsn'
-    model = 'eigen'
+    model = 'pgsn'
+    # model = 'eigen'
     label = f"_t{train_timesteps}_{model}"
 
     push_to_hub = False  # whether to upload the saved model to the HF Hub
@@ -50,8 +50,8 @@ class CommunitySmallConfig:
     dropout=0.1
     attn_clamp = False
     
-    # data_format = 'graph'
-    data_format = 'eigen'
+    data_format = 'graph'
+    # data_format = 'eigen'
     reflect=True
     zero_diagonal=True
 

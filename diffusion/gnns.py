@@ -225,7 +225,7 @@ class ScoreNetworkTest_eigen(torch.nn.Module):
 
         self.act = nn.SiLU()
 
-    def forward(self, x, adj, flags, u, la, t):
+    def forward(self, la, t):
 
         timesteps = t
         temb = layers.get_timestep_embedding(timesteps, self.nf)

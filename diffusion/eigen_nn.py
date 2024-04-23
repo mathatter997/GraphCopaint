@@ -27,7 +27,7 @@ class EigenNN(torch.nn.Module):
         self.layers = torch.nn.ModuleList(
             [   
                 ScoreNetworkX(max_feat_num, depth, nhid),
-                ScoreNetworkTest_eigen(
+                ScoreNetworkA_eigen(
                     max_feat_num,
                     nhid,
                     max_node_num,
@@ -46,5 +46,6 @@ class EigenNN(torch.nn.Module):
 
     def forward(self, x, adj, flags, u, la, t):
         ex = self.layers[0](x, adj, flags, u, la)
-        ela = self.layers[1](x, adj, flags, u, la, t)
+        # ela = self.layers[1](x, adj, flags, u, la, t)
+        ela = self.layers[1](x, adj, flags, u, la)
         return ex, ela
