@@ -192,6 +192,7 @@ def copaint(
                 "coef_xt_reg_decay": coef_xt_reg_decay,
                 "sampler": config.sampler,
                 "lr_xt_path": lr_xt_path,
+                "opt_num_path": opt_num_path,
             },
         )
     for prev_t, cur_t in time_pairs:
