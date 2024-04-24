@@ -19,8 +19,10 @@ class EgoSmallConfig:
 
     output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
-    # model = 'pgsn'
-    model = 'eigen'
+    model = 'pgsn'
+    # model = 'eigen'
+    data_format = 'graph'
+    # data_format = 'eigen'
     label = f"_t{train_timesteps}_{model}"
 
     push_to_hub = False  # whether to upload the saved model to the HF Hub
@@ -45,8 +47,6 @@ class EgoSmallConfig:
     beta_start = 0.0001
     beta_end = 0.02
 
-    # data_format = 'graph'
-    data_format = 'eigen'
     reflect=True
     zero_diagonal=True
 

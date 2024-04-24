@@ -63,7 +63,7 @@ import random
               type=click.Choice(["square", "naive_square", "none"], case_sensitive=False))
 @click.option("--tau", default=5)
 @click.option("--lr_xt", default=0.0025)
-@click.option("--lr_xt_decay", default=1.05)
+@click.option("--lr_xt_decay", default=1.00)
 @click.option("--coef_xt_reg", default=0.01)
 @click.option("--coef_xt_reg_decay", default=1.0)
 @click.option("--use_adaptive_lr_xt", default=True)

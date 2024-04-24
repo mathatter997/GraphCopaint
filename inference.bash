@@ -215,8 +215,40 @@
 #  --scheduler_path models/Ego_small/scheduler_config.json \
 #  --output_path data/dataset/output_ego_small_vpsde.json
 
-CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --use_ema True --cpu True --num_samples 1000 \
- --sampler ddim --log_x0_predictions False --max_n_nodes 18 \
- --checkpoint_path models/Ego_small/gnn/diag_vpsde_bm5_100000.pth \
+#  SIBLE_DEVICES="0" python inference.py --config_type ego_small  --use_ema True --cpu True --num_samples 1000 \
+#  --sampler ddpm --log_x0_predictions False --max_n_nodes 18 \
+#  --checkpoint_path models/Ego_small/gnn/diag_vpsde_bm5_100000.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddpm.json
+
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --use_ema True --cpu True --num_samples 1000 \
+#  --sampler ddim --log_x0_predictions False --max_n_nodes 18 \
+#  --checkpoint_path models/Ego_small/gnn/diag_vpsde_bm5_100000.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddim.json
+
+
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu True --num_samples 1 \
+#  --sampler ddim --log_x0_predictions True \
+#  --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/dataset/output_ego_small_ddim_s1.json
+
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type community_small  --cpu True --num_samples 1 \
+#  --sampler ddim --log_x0_predictions True --max_n_nodes 20 \
+#  --checkpoint_path models/Community_small/gnn/diag_vpsde_bm5_100000.pth \
+#  --scheduler_path models/Community_small/scheduler_config.json \
+#  --output_path data/output_com_small_vpsde_s1.json
+
+
+# CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu True --num_samples 1 \
+#  --sampler ddim --log_x0_predictions True --max_n_nodes 18 \
+#  --checkpoint_path models/Ego_small/gnn/diag_vpsde_bm5_100000.pth \
+#  --scheduler_path models/Ego_small/scheduler_config.json \
+#  --output_path data/output_ego_small_vpsde_s1.json
+
+ CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu True --num_samples 1 \
+ --sampler ddim --log_x0_predictions True --max_n_nodes 18 \
+ --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
  --scheduler_path models/Ego_small/scheduler_config.json \
- --output_path data/dataset/output_ego_small_ddim.json
+ --output_path data/output_ego_small_vpsde_s1.json

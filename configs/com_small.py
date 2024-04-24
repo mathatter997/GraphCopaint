@@ -20,6 +20,8 @@ class CommunitySmallConfig:
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
     model = 'pgsn'
     # model = 'eigen'
+    data_format = 'graph'
+    # data_format = 'eigen'
     label = f"_t{train_timesteps}_{model}"
 
     push_to_hub = False  # whether to upload the saved model to the HF Hub
@@ -32,7 +34,7 @@ class CommunitySmallConfig:
     # beta_end = 0.005
 
     beta_start = 0.0001
-    beta_end = 0.02
+    beta_end = 0.005
 
     # pgsn params
     seed = 0
@@ -50,8 +52,6 @@ class CommunitySmallConfig:
     dropout=0.1
     attn_clamp = False
     
-    data_format = 'graph'
-    # data_format = 'eigen'
     reflect=True
     zero_diagonal=True
 

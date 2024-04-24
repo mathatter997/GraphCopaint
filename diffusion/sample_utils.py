@@ -223,7 +223,7 @@ def optimize_xt(
     config,
     model,
     noise_scheduler,
-    adj_t,
+    data_t,
     t,
     adj_mask,
     target_adj,
@@ -240,46 +240,78 @@ def optimize_xt(
     use_adaptive_lr_xt,
     num_timesteps,
     reflect=True,
+    flags=None,
+    u=None,
 ):
-    time = torch.full((batch_size,), t.item(), device=accelerator.device)
+    if config.data_format == 'eigen':
+        x_t, la_t, adj_t = data_t
+    else:
+        adj_t = data_t
     origin_adj = adj_t.clone().detach()
+
     for step in range(num_iteration_optimize_xt):
-        e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-        adj_0 = pred_x0(
-            et=e0,
-            xt=adj_t,
-            t=t,
-            mask=adj_mask,
-            scheduler=noise_scheduler,
-            interval_num=interval_num,
-            reflect=reflect,
-        )
+        data_0 = predict_data0(config,
+                  model,
+                  data_t,
+                  t,
+                  batch_size,
+                  noise_scheduler,
+                  interval_num,
+                  num_timesteps,
+                  adj_mask,
+                  accelerator,
+                  u=u,
+                  flags=flags,
+                  reflect=reflect)
+        if config.data_format == 'eigen':
+            x_0, la_0, adj_0 = data_0 
+            u_T = u.transpose(-1, -2)
+        else:
+            adj_0 = data_0
+
         loss = loss_fn(target_adj, adj_0, target_mask) + coef_xt_reg * reg_fn(
             origin_adj, adj_t
         )
         loss = loss / loss_norm
-        adj_t_grad = torch.autograd.grad(
-            loss, adj_t, retain_graph=False, create_graph=False
-        )[0].detach()
-        if reflect:
-            adj_t_grad = (adj_t_grad + adj_t_grad.transpose(-1, -2)) / 2
-        adj_t_grad = adj_t_grad * adj_mask
-        new_adj_t = adj_t - lr_xt * adj_t_grad * loss_norm
+        if config.data_format == 'eigen':
+            la_t_grad = torch.autograd.grad(
+                loss, la_t, retain_graph=False, create_graph=False
+            )[0].detach()
+            new_la_t = la_t - lr_xt * la_t_grad * loss_norm
+            new_adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(new_la_t), u_T))
+            new_data_t = (x_t, new_la_t, new_adj_t)
+        else:
+            adj_t_grad = torch.autograd.grad(
+                loss, adj_t, retain_graph=False, create_graph=False
+            )[0].detach()
+            if reflect:
+                adj_t_grad = (adj_t_grad + adj_t_grad.transpose(-1, -2)) / 2
+            adj_t_grad = adj_t_grad * adj_mask
+            new_adj_t = adj_t - lr_xt * adj_t_grad * loss_norm
+            new_data_t = new_adj_t
         # if new_x doesn't improve loss
         # we start from x and try again with a smaller grad step
         lr_xt_temp = lr_xt
         while use_adaptive_lr_xt:
             with torch.no_grad():
-                e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-                adj_0 = pred_x0(
-                    et=e0,
-                    xt=new_adj_t,
-                    t=t,
-                    mask=adj_mask,
-                    scheduler=noise_scheduler,
-                    interval_num=interval_num,
-                    reflect=reflect,
-                )
+                data_0 = predict_data0(config,
+                  model,
+                  new_data_t,
+                  t,
+                  batch_size,
+                  noise_scheduler,
+                  interval_num,
+                  num_timesteps,
+                  adj_mask,
+                  accelerator,
+                  u=u,
+                  flags=flags,
+                  reflect=reflect)
+                if config.data_format == 'eigen':
+                    x_0, la_0, adj_0 = data_0 
+                else:
+                    adj_0 = data_0
+
                 new_loss = loss_fn(
                     target_adj, adj_0, target_mask
                 ) + coef_xt_reg * reg_fn(origin_adj, new_adj_t)
@@ -289,10 +321,17 @@ def optimize_xt(
                 else:
                     lr_xt_temp *= 0.8
                     del new_adj_t, new_loss
-                    new_adj_t = adj_t - lr_xt_temp * adj_t_grad * loss_norm
+                    if config.data_format == 'eigen':
+                        new_la_t = la_t - lr_xt_temp * la_t_grad * loss_norm
+                        new_adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(new_la_t), u_T))
+                        new_data_t = (x_t, new_la_t, new_adj_t)
+                    else:
+                        new_adj_t = adj_t - lr_xt_temp * adj_t_grad * loss_norm
+                        new_data_t = new_adj_t
+
         # optimized x, pred_x0, and e_t
         adj_t = new_adj_t.detach().requires_grad_()
-        del loss, adj_t_grad, adj_0, e0
+        del loss, adj_t_grad, adj_0
         if accelerator.device.type == "cuda":
             torch.cuda.empty_cache()
     return adj_t
@@ -315,3 +354,55 @@ def init_xT(config, batch_size, sizes, accelerator, zero_diagonal=True):
     adj_t = (adj_t + adj_t.transpose(-1, -2)) / sqrt_2
     adj_t = adj_t * adj_mask
     return adj_t, adj_mask
+
+
+def predict_data0(config,
+                  model,
+                  data_t,
+                  t,
+                  batch_size,
+                  noise_scheduler,
+                  interval_num,
+                  num_timesteps,
+                  adj_mask,
+                  accelerator,
+                  u=None,
+                  flags=None,
+                  reflect=True):
+    time = torch.full((batch_size,), t.item(), device=accelerator.device)
+    if config.data_format == 'eigen':
+        x_t, la_t, adj_t = data_t
+        u_T = u.transpose(-1, -2)
+        ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+        la_0 = pred_x0(et=ela0,
+                        xt=la_t,
+                        t=t,
+                        mask=None,
+                        scheduler=noise_scheduler,
+                        interval_num=interval_num,
+                        reflect=False,
+                        )
+        x_0 = pred_x0(et=ex0,
+                    xt=x_t,
+                    t=t,
+                    mask=None,
+                    scheduler=noise_scheduler,
+                    interval_num=interval_num,
+                    reflect=False,
+                    )
+        adj_0 = torch.bmm(u, torch.bmm(torch.diag_embed(la_0), u_T))
+        return x_0, la_0, adj_0
+    else:
+        adj_t = data_t
+        e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
+        adj_0 = pred_x0(
+            et=e0,
+            xt=adj_t,
+            t=t,
+            mask=adj_mask,
+            scheduler=noise_scheduler,
+            interval_num=interval_num,
+            reflect=reflect,
+        )
+        return adj_0
+

@@ -138,9 +138,38 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
             std = std.unsqueeze(-1)
         e0 = score
         x0 = (x - std * e0) / denom
-
+        
 
         return ScoreSdeVpSchedulerOutput(x0)
+    
+    def add_noise(self, x, noise, t, generator=None):
+        """
+        Predict the sample from the previous timestep by reversing the SDE. This function propagates the diffusion
+        process from the learned model outputs (most often the predicted noise).
 
+        Args:
+            score ():
+            x ():
+            t ():
+            generator (`torch.Generator`, *optional*):
+                A random number generator.
+        """
+        if self.timesteps is None:
+            raise ValueError(
+                "`self.timesteps` is not set, you need to run 'set_timesteps' after creating the scheduler"
+            )
+
+        # TODO(Patrick) better comments + non-PyTorch
+        # postprocess model score
+        log_mean_coeff = -0.25 * t**2 * (self.config.beta_max - self.config.beta_min) - 0.5 * t * self.config.beta_min
+        drift = torch.exp(log_mean_coeff)
+        std = torch.sqrt(1.0 - torch.exp(2.0 * log_mean_coeff))
+        std = std.flatten()
+        while len(std.shape) < len(x.shape):
+            std = std.unsqueeze(-1)
+        while len(drift.shape) < len(x.shape):
+            drift = drift.unsqueeze(-1)
+        return drift * x + std * noise
+        
     def __len__(self):
         return self.config.num_train_timesteps

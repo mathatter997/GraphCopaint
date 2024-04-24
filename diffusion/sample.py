@@ -60,10 +60,6 @@ def sample(
                 adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
                 x_t = mask_x(x_t, flags)
                 adj_t = mask_adjs(adj_t, flags)
-                # la_t = torch.clamp(la_t, -4, 4)
-                # x_t = torch.clamp(x_t, -5, 5)
-
-                # print(torch.norm(adj_t), t)
                 if log_x0_predictions:
                     diffs.append(torch.norm(adj_t - prev_adj_t))
                     la_0 = pred_x0(
@@ -128,6 +124,7 @@ def copaint(
     num_iteration_optimize_xt=2,
     target_mask=None,
     target_adj=None,
+    u=None,
     log_x0_predictions=False,
     lr_xt_path=None,
     opt_num_path=None,
@@ -142,10 +139,19 @@ def copaint(
 
     reflect = config.reflect
     zero_diagonal = config.zero_diagonal
-
-    adj_t, adj_mask = init_xT(
-        config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
-    )
+    if config.data_format == 'eigen':
+        x_t = torch.randn((batch_size, config.max_n_nodes, config.max_feat_num), device=accelerator.device)
+        la_t =  torch.randn((batch_size, config.max_n_nodes), device=accelerator.device)
+        u_T = u.transpose(-1, -2)
+        adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+        flags = torch.zeros(batch_size, config.max_n_nodes, device=accelerator.device)
+        for i in range(batch_size):
+            flags[i,:sizes[i]] = 1
+    else:
+        flags = None
+        adj_t, adj_mask = init_xT(
+            config, batch_size, sizes, accelerator, zero_diagonal=zero_diagonal
+        )
 
     T = noise_scheduler.timesteps[0].item()
     time_pairs = list(
@@ -171,6 +177,7 @@ def copaint(
             num_iteration_optimize_x = torch.flip(num_iteration_optimize_x, [0])
     coef_x_reg = coef_xt_reg * torch.pow(coef_xt_reg_decay, torch.arange(T + 1))
     coef_x_reg = torch.flip(coef_x_reg, [0])
+
     if log_x0_predictions:
         wandb.init(
             # set the wandb project where this run will be logged
@@ -195,6 +202,7 @@ def copaint(
                 "opt_num_path": opt_num_path,
             },
         )
+    model.eval()
     for prev_t, cur_t in time_pairs:
         for repeat_step in range(repeat_tt):
             # optimize x_t given x_0
@@ -202,18 +210,26 @@ def copaint(
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
                     lr_xt = lr_x[t_]
                     coef_xt_reg = coef_x_reg[t_]
-                    model.eval()
                     t = torch.tensor(t_)
-                    adj_t = adj_t * adj_mask
-                    adj_t = adj_t.detach().requires_grad_()
                     time = torch.full(
                         (batch_size,), t.item(), device=accelerator.device
                     )
-                    adj_t = optimize_xt(
+                    if config.data_format == 'eigen':
+                        la_t = la_t.detach().requires_grad_()
+                        x_t = mask_x(x_t, flags).detach().requires_grad_()
+                        adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+                        adj_t = mask_adjs(adj_t, flags)
+                        data_t = (x_t, la_t, adj_t)
+                    else:
+                        adj_t = adj_t * adj_mask
+                        adj_t = adj_t.detach().requires_grad_()
+                        data_t = adj_t
+
+                    data_t = optimize_xt(
                         config,
                         model,
                         noise_scheduler,
-                        adj_t,
+                        data_t,
                         t,
                         adj_mask,
                         target_adj,
@@ -230,21 +246,41 @@ def copaint(
                         use_adaptive_lr_xt,
                         num_timesteps,
                         reflect=reflect,
+                        u=u,
+                        flags=flags,
                     )
+                    if config.data_format == 'eigen':
+                        x_t, la_t, _ = data_t
+                    else:
+                        adj_t = data_t
+
                     if log_x0_predictions and repeat_step == repeat_tt - 1:
-                        e0 = predict_e0(
-                            config, model, adj_t, time, num_timesteps, adj_mask
-                        )
-                        adj_0 = pred_x0(
-                            et=e0,
-                            xt=adj_t,
-                            t=t,
-                            mask=adj_mask,
-                            scheduler=noise_scheduler,
-                            interval_num=interval_num,
-                            reflect=reflect,
-                        )
-                        sz = torch.numel(adj_t)
+                        if config.data_format == 'eigen':
+                            ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+                            la_0 = pred_x0(
+                                et=ela0,
+                                xt=la_t,
+                                t=t,
+                                mask=None,
+                                scheduler=noise_scheduler,
+                                interval_num=1,
+                                reflect=False,
+                            )
+                            adj_0 = torch.bmm(u, torch.bmm(torch.diag_embed(la_0), u_T))
+                        else:
+                            e0 = predict_e0(
+                                config, model, adj_t, time, num_timesteps, adj_mask
+                            )
+                            adj_0 = pred_x0(
+                                et=e0,
+                                xt=adj_t,
+                                t=t,
+                                mask=adj_mask,
+                                scheduler=noise_scheduler,
+                                interval_num=interval_num,
+                                reflect=reflect,
+                            )
+                        sz = torch.numel(adj_0)
                         target_loss = (
                             torch.sum(
                                 (adj_0 * target_mask - target_adj * target_mask) ** 2
@@ -259,10 +295,17 @@ def copaint(
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 
-                    e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-                    adj_t = predict_xnext(
-                        config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
-                    )
+                    if config.data_format == 'eigen':
+                        ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+                        x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
+                        la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
+                        adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
+                        adj_t = mask_adjs(adj_t, flags)
+                    else:
+                        e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
+                        adj_t = predict_xnext(
+                            config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
+                        )
 
                 # time-travel (forward diffusion)
                 if time_travel and (cur_t + 1) <= T - tau:
@@ -310,12 +353,18 @@ def repaint(
     )
 
     T = noise_scheduler.timesteps[0].item()
-    time_pairs = list(
-        zip(noise_scheduler.timesteps[::tau], noise_scheduler.timesteps[tau::tau])
-    )
-    end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
+    if config.sampler == "vpsde":
+        time_pairs = list(
+            zip(torch.round((noise_scheduler.timesteps[::tau] * num_timesteps)).to(dtype=torch.int), 
+                torch.round(noise_scheduler.timesteps[tau::tau] * num_timesteps).to(dtype=torch.int))
+        )
+        end = (time_pairs[-1][-1], torch.tensor(0, device=accelerator.device))
+    else:
+        time_pairs = list(
+            zip(noise_scheduler.timesteps[::tau], noise_scheduler.timesteps[tau::tau])
+        )
+        end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
-
     if log_x0_predictions:
         wandb.init(
             # set the wandb project where this run will be logged
@@ -335,6 +384,8 @@ def repaint(
         for repeat_step in range(repeat_tt):
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
+                    if config.sampler == "vpsde":
+                        t_ = t_ / num_inference_steps
                     t = torch.tensor(t_)
                     time = torch.full((batch_size,), t_, device=accelerator.device)
                     with torch.no_grad():
@@ -358,7 +409,7 @@ def repaint(
                         adj_0 = pred_x0(
                             et=e0,
                             xt=adj_t,
-                            t=t_,
+                            t=t,
                             mask=adj_mask,
                             scheduler=noise_scheduler,
                             interval_num=1,
