@@ -14,7 +14,7 @@ loss_mode="naive_inpaint"
 reg_mode="naive_square"
 
 for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
-    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu False --num_samples 32 \
+    CUDA_VISIBLE_DEVICES="0" python inference.py --config_type ego_small  --cpu True --num_samples 32 \
         --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
         --lr_xt_path ${lr_xt_paths[$i]}.json \
         --loss_mode ${loss_mode} --reg_mode ${reg_mode} \
