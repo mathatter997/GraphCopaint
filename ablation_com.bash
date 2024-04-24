@@ -144,18 +144,18 @@ lr_xt_paths=(lr_x/exp_init25_decay1.0.json \
 loss_mode="naive_inpaint"
 reg_mode="naive_square"
 
-for ((i = 0; i < ${#opt_num_paths[@]}; i++)); do
-    CUDA_VISIBLE_DEVICES="1" python inference.py --config_type community_small  --cpu False --num_samples 32 \
+for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
+    CUDA_VISIBLE_DEVICES="1" python inference.py --config_type community_small  --cpu True --num_samples 1 \
         --sampler ddim --inpainter 'copaint' --num_timesteps 1000 \
-        --lr_xt_path ${lr_xt_path} --opt_num_path ${opt_num_paths[$i]} \
+        --lr_xt_path ${lr_xt_paths[$i]} \
         --loss_mode ${loss_mode} --reg_mode ${reg_mode} \
         --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
         --use_adaptive_lr_xt False \
         --checkpoint_path models/Community_small/gnn/checkpoint_epoch_400000_t1000_psgn.pth \
         --scheduler_path models/Community_small/scheduler_config.json \
-        --output_path data/dataset/ablation/com/output_copaint_${opt_num_paths[$i]}.json \
-        --mask_path data/dataset/ablation/com/mask_copaint_${opt_num_paths[$i]}.json \
-        --masked_output_path data/dataset/ablation/com/masked_output_copaint_${opt_num_paths[$i]}.json \
+        --output_path data/dataset/ablation/com/output_copaint_${lr_xt_paths[$i]}.json \
+        --mask_path data/dataset/ablation/com/mask_copaint_${lr_xt_paths[$i]}.json \
+        --masked_output_path data/dataset/ablation/com/masked_output_copaint_${lr_xt_paths[$i]}.json \
         --log_x0_predictions True
 done
 
