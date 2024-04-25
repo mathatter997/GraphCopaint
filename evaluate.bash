@@ -74,7 +74,7 @@ lr_xt_paths=(exp_init25_decay1.0 \
             )
 echo COM
 for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
-    python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/eigen/output_copaint_${lr_xt_paths[$i]}.json 
+    python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json 
     echo ${lr_xt_paths[$i]}
 done
 # lr_xt_paths=(exp_init25_decay1.006)
