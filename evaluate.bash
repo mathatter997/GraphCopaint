@@ -78,7 +78,7 @@ for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
     python evaluate.py --dataset 'Community_small' \
     --pred_file data/dataset/ablation/com/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
     --inpaint_loss True --mask_path data/dataset/ablation/com/mask_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
-    --masked_target_path data/dataset/ablation/com/masked_output_copaint_noclip_adaptivet_${lr_xt_paths[$i]}.json 
+    --masked_target_path data/dataset/ablation/com/masked_output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json 
     echo ${lr_xt_paths[$i]}
 done
 echo EGO
