@@ -25,20 +25,24 @@ def evaluate(
             data_path, dataset, device="cpu"
         )
         pred_graphs, _ = load_data(pred_file)
-
         for i, graph in enumerate(pred_graphs):
             edge_index = graph.edge_index
             if len(edge_index):
                 reverse_edge_index = torch.stack([edge_index[1], edge_index[0]], dim=0)
                 edge_index = torch.cat([edge_index, reverse_edge_index], dim=1)
-                temp = Data(edge_index=edge_index)
+                temp = Data(edge_index=edge_index, num_nodes=graph.card)
                 pred_graphs[i] = temp
 
         results_data = eval_fn(test_dataset=test_dataset, pred_graph_list=train_dataset)
         results_pred = eval_fn(test_dataset=test_dataset, pred_graph_list=pred_graphs)
-        print(f"{dataset} data:", results_data)
-        print(f"{dataset} pred:", results_pred)
-
+        # print(f"{dataset} data:", results_data)
+        # print(f"{dataset} pred:", results_pred)
+        deg = results_pred['degree_rbf']
+        clus = results_pred['cluster_rbf']
+        spec = results_pred['spectral_rbf']
+        avg = (results_pred['degree_rbf'] + results_pred['cluster_rbf'] + results_pred['spectral_rbf'])/3
+        ans = f'{deg:.3f} & {clus:.3f} & {spec:.3f} & {avg:.3f}'
+        print(ans)
     else:
         pred_graphs, _ = load_data(pred_file)
         for i, graph in enumerate(pred_graphs):
@@ -72,7 +76,7 @@ def evaluate(
             # print(pred.shape, mask.shape, target.shape)
             pred = pred[:n, :n]
             mask = mask[:n, :n]
-            loss.append(np.sum((pred * mask - target * mask) ** 2))
+            loss.append(np.sum(np.abs((pred * mask - target * mask))))
         loss = np.array(loss)
         mean = np.mean(loss)
         print(f"{dataset} mean loss:", mean)
