@@ -76,17 +76,17 @@ echo COM
 # lr_xt_paths=(exp_init25_decay1.006)
 for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
     python evaluate.py --dataset 'Community_small' \
-    --pred_file data/dataset/ablation/com/output_copaint_${lr_xt_paths[$i]}.json \
-    --inpaint_loss True --mask_path data/dataset/ablation/com/mask_copaint_${lr_xt_paths[$i]}.json \
-    --masked_target_path data/dataset/ablation/com/masked_output_copaint_${lr_xt_paths[$i]}.json 
+    --pred_file data/dataset/ablation/com/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
+    --inpaint_loss True --mask_path data/dataset/ablation/com/mask_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
+    --masked_target_path data/dataset/ablation/com/masked_output_copain_noclip_adaptivet_${lr_xt_paths[$i]}.json 
     echo ${lr_xt_paths[$i]}
 done
 echo EGO
 for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
     python evaluate.py --dataset 'Ego_small' \
-    --pred_file data/dataset/ablation/ego/output_copaint_${lr_xt_paths[$i]}.json \
-    --inpaint_loss True --mask_path data/dataset/ablation/ego/mask_copaint_${lr_xt_paths[$i]}.json \
-    --masked_target_path data/dataset/ablation/ego/masked_output_copaint_${lr_xt_paths[$i]}.json 
+    --pred_file data/dataset/ablation/ego/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
+    --inpaint_loss True --mask_path data/dataset/ablation/ego/mask_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json \
+    --masked_target_path data/dataset/ablation/ego/masked_output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json 
     echo ${lr_xt_paths[$i]}
 done
 # python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/eigen/ddim_control.json 
