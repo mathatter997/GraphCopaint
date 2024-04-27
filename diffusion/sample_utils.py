@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from .utils import mask_adjs, mask_x
 
 
 def get_loss_fn(mode):
@@ -184,20 +185,32 @@ def predict_xnext(config, noise_scheduler, e0, xt, mask, t, reflect=True):
     return xnext
 
 def time_travel_fn(
-    adj_t,
-    adj_mask,
+    config,
+    data_t,
+    data_mask,
     noise_scheduler,
     accelerator,
     prev_t,
     cur_t,
     optimize_before_time_travel,
+    u=None,
 ):
     if optimize_before_time_travel:
         pass
     sqrt_2 = 2**0.5
-    noise = torch.randn(adj_t.shape, device=accelerator.device)
-    noise = noise + noise.transpose(-1, -2)
-    noise = noise * adj_mask / sqrt_2
+
+    if config.data_format == 'eigen':
+        x_t, la_t, adj_t = data_t
+        flags = data_mask
+        noise_x = torch.randn(x_t.shape, device=accelerator.device)
+        noise_la = torch.randn(la_t.shape, device=accelerator.device)
+        u_T = u.transpose(-1, 2)
+    else:
+        adj_t = data_t
+        adj_mask = data_mask
+        noise = torch.randn(adj_t.shape, device=accelerator.device)
+        noise = noise + noise.transpose(-1, -2)
+        noise = noise * adj_mask / sqrt_2
 
     alphas_cumprod = noise_scheduler.alphas_cumprod.to(
         dtype=adj_t.dtype, device=accelerator.device
@@ -213,10 +226,18 @@ def time_travel_fn(
     while len(sqrt_one_minus_alpha_prod.shape) < len(adj_t.shape):
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
 
-    adj_prev = sqrt_alpha_prod * adj_t + sqrt_one_minus_alpha_prod * noise
-    adj_t = adj_prev * adj_mask
-
-    return adj_t
+    if config.data_format == 'eigen':
+        x_prev = sqrt_alpha_prod * x_t + sqrt_one_minus_alpha_prod * noise_x
+        la_prev = sqrt_alpha_prod * la_t + sqrt_one_minus_alpha_prod * noise_la
+        la_prev = la_prev.squeeze(0)
+        adj_prev = torch.bmm(u, torch.bmm(torch.diag_embed(la_prev), u_T))
+        x_prev = mask_x(x_prev, flags)
+        adj_prev = mask_adjs(adj_prev, flags)
+        return x_prev, la_prev, adj_prev
+    else: 
+        adj_prev = sqrt_alpha_prod * adj_t + sqrt_one_minus_alpha_prod * noise
+        adj_t = adj_prev * adj_mask
+        return adj_t
 
 
 def optimize_xt(
@@ -245,11 +266,15 @@ def optimize_xt(
 ):
     if config.data_format == 'eigen':
         x_t, la_t, adj_t = data_t
+        u_T = u.transpose(-1, -2)
     else:
         adj_t = data_t
     origin_adj = adj_t.clone().detach()
-
     for step in range(num_iteration_optimize_xt):
+        if config.data_format == 'eigen':
+            x_t, la_t, adj_t = data_t
+        else:
+            adj_t = data_t
         data_0 = predict_data0(config,
                   model,
                   data_t,
@@ -265,20 +290,20 @@ def optimize_xt(
                   reflect=reflect)
         if config.data_format == 'eigen':
             x_0, la_0, adj_0 = data_0 
-            u_T = u.transpose(-1, -2)
         else:
             adj_0 = data_0
-
         loss = loss_fn(target_adj, adj_0, target_mask) + coef_xt_reg * reg_fn(
             origin_adj, adj_t
         )
         loss = loss / loss_norm
+        print(loss, loss_norm, t)
         if config.data_format == 'eigen':
             la_t_grad = torch.autograd.grad(
-                loss, la_t, retain_graph=False, create_graph=False
+                loss, la_t, retain_graph=True, create_graph=False
             )[0].detach()
             new_la_t = la_t - lr_xt * la_t_grad * loss_norm
             new_adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(new_la_t), u_T))
+            new_adj_t = mask_adjs(new_adj_t, flags)
             new_data_t = (x_t, new_la_t, new_adj_t)
         else:
             adj_t_grad = torch.autograd.grad(
@@ -324,17 +349,21 @@ def optimize_xt(
                     if config.data_format == 'eigen':
                         new_la_t = la_t - lr_xt_temp * la_t_grad * loss_norm
                         new_adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(new_la_t), u_T))
+                        new_adj_t = mask_adjs(new_adj_t, flags)
                         new_data_t = (x_t, new_la_t, new_adj_t)
                     else:
                         new_adj_t = adj_t - lr_xt_temp * adj_t_grad * loss_norm
                         new_data_t = new_adj_t
 
         # optimized x, pred_x0, and e_t
-        adj_t = new_adj_t.detach().requires_grad_()
-        del loss, adj_t_grad, adj_0
+        if config.data_format == 'eigen':
+            data_t = (x_t.detach().requires_grad_(), new_la_t.detach().requires_grad_(), new_adj_t.detach().requires_grad_())
+        else:
+            data_t = new_adj_t.detach().requires_grad_()
+        # del loss, adj_0
         if accelerator.device.type == "cuda":
             torch.cuda.empty_cache()
-    return adj_t
+    return data_t
 
 def init_xT(config, batch_size, sizes, accelerator, zero_diagonal=True):
     sqrt_2 = 2 ** 0.5
