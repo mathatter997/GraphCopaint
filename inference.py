@@ -70,6 +70,8 @@ import random
 @click.option("--max_n_nodes", default=None, type=int)
 @click.option("--lr_xt_path",default=None)
 @click.option("--opt_num_path",default=None)
+@click.option("--alpha",default=1.0)
+
 def inference(
     config_type,
     checkpoint_path,
@@ -100,6 +102,7 @@ def inference(
     lr_xt_path,
     opt_num_path,
     max_n_nodes,
+    alpha,
 ):
     if config_type == "community_small":
         config = CommunitySmallConfig()
@@ -169,21 +172,34 @@ def inference(
         assert mask_path is not None and masked_output_path is not None
         all_batches = []
         sizes = []
-        if config.data_format == 'graph':
-            while True:
-                for graph in targets:
-                    n = graph.num_nodes
-                    adj = torch.zeros(1, 1, max_n_nodes, max_n_nodes)
-                    adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
-                    all_batches.append(adj)
-                    sizes.append(n)
+        if config.data_format != 'pixel':
+            if config.data_format == 'graph':
+                while True:
+                    for graph in targets:
+                        n = graph.num_nodes
+                        adj = torch.zeros(1, 1, max_n_nodes, max_n_nodes)
+                        adj[0, 0, :n, :n] = to_dense_adj(graph.edge_index)
+                        all_batches.append(adj)
+                        sizes.append(n)
+                        if len(sizes) == num_samples:
+                            break
                     if len(sizes) == num_samples:
                         break
-                if len(sizes) == num_samples:
-                    break
-            targets = torch.cat(all_batches, dim=0)
-            targets = targets.to(device=accelerator.device)
-            targets = targets * 2 - 1
+                targets = torch.cat(all_batches, dim=0)
+                targets = targets.to(device=accelerator.device)
+                targets = targets * 2 - 1
+            else:
+                while True:
+                    for i, adj in enumerate(targets):
+                        n = train_dataset[i].num_nodes
+                        all_batches.append(adj)
+                        sizes.append(n)
+                        if len(sizes) == num_samples:
+                            break
+                    if len(sizes) == num_samples:
+                        break
+                targets = torch.vstack(all_batches).reshape(-1, 1, max_n_nodes,max_n_nodes)
+                targets = targets.to(device=accelerator.device)
             masks = torch.ones(targets.shape, device=accelerator.device)
             masks = torch.tril(masks, diagonal=-1)
             for k, size in enumerate(sizes):
@@ -202,6 +218,9 @@ def inference(
             pred_adj_list = [nx.from_numpy_array(adj[0]) for adj in masks.cpu().numpy()[:num_samples]]
             pred_adj_list = [Lobster(adj) for adj in pred_adj_list]
             prepare_json_dataset(pred_adj_list, mask_path)
+            if config.data_format == 'eigen':
+                masks = masks.squeeze(1)
+                targets = targets.squeeze(1)
         elif config.data_format == 'pixel':
             masks = []
             for i in range(len(targets)):
@@ -222,11 +241,12 @@ def inference(
         sizes = torch.multinomial(
             torch.Tensor(n_node_pmf), num_samples, replacement=True
         )
-        if config.data_format == 'eigen':
-            u_list = []
-            for size in sizes:
-                u_list.append(random.choice(u_mats[size.item()]).unsqueeze(0))
-            u_list = torch.vstack(u_list)
+    if config.data_format == 'eigen':
+        u_list = []
+        for size in sizes:
+            size = int(size)
+            u_list.append(random.choice(u_mats[size]).unsqueeze(0))
+        u_list = torch.vstack(u_list)
 
     config.sampler = sampler 
     if sampler == "ddim":
@@ -281,20 +301,25 @@ def inference(
     )
 
     if use_ema:
-        # ema_x = ExponentialMovingAverage(model.layers[0].parameters(), decay=0.9999)
-        # ema_adj = ExponentialMovingAverage(model.layers[1].parameters(), decay=0.9999)
-        # ema_x.load_state_dict(checkpoint["ema_x"])
-        # ema_adj.load_state_dict(checkpoint["ema_adj"])
-        # ema_x.copy_to(model.layers[0].parameters())
-        # ema_adj.copy_to(model.layers[1].parameters())
-        ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
-        ema.load_state_dict(checkpoint["ema_state_dict"])
-        # ema.load_state_dict(checkpoint["ema"])
-        ema.copy_to(model.parameters())
+        if config.data_format == 'eigen':
+            ema_x = ExponentialMovingAverage(model.layers[0].parameters(), decay=0.9999)
+            ema_adj = ExponentialMovingAverage(model.layers[1].parameters(), decay=0.9999)
+            ema_x.load_state_dict(checkpoint["ema_x"])
+            ema_adj.load_state_dict(checkpoint["ema_adj"])
+            ema_x.copy_to(model.layers[0].parameters())
+            ema_adj.copy_to(model.layers[1].parameters())
+        else:
+            ema = ExponentialMovingAverage(model.parameters(), decay=0.9999)
+            ema.load_state_dict(checkpoint["ema_state_dict"])
+            # ema.load_state_dict(checkpoint["ema"])
+            ema.copy_to(model.parameters())
     else:
-        # model.load_state_dict(checkpoint["model_state_dict"])
-        model.layers[0].load_state_dict(checkpoint["x_state_dict"])
-        model.layers[1].load_state_dict(checkpoint["adj_state_dict"])
+        if config.data_format == 'eigen':
+            model.layers[0].load_state_dict(checkpoint["x_state_dict"])
+            model.layers[1].load_state_dict(checkpoint["adj_state_dict"])
+        else:
+            # model.load_state_dict(checkpoint["model_state_dict"])
+            checkpoint['ema_state_dict'] = model.parameters()
 
     model = accelerator.prepare(model)
     model.eval()
@@ -316,6 +341,7 @@ def inference(
                 u=u_batch,
                 accelerator=accelerator,
                 log_x0_predictions=log_x0_predictions,
+                alpha=alpha,
             )
         elif inpainter == 'copaint':
             edges = copaint(
@@ -342,6 +368,7 @@ def inference(
                 use_adaptive_lr_xt=use_adaptive_lr_xt,
                 lr_xt_path=lr_xt_path,
                 opt_num_path=opt_num_path,
+                u=u_batch,
             )
         elif inpainter == 'repaint':
             edges = repaint(
