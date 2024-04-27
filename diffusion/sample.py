@@ -24,6 +24,7 @@ def sample(
     sizes=None,
     u=None,
     log_x0_predictions=False,
+    alpha = 1,
 ):
     model.eval()
     batch_size = len(sizes)
@@ -47,21 +48,29 @@ def sample(
     if log_x0_predictions:
         adj_0s = []
         diffs = []
+    time = torch.full((batch_size,), noise_scheduler.timesteps[0].item(), device=accelerator.device)
+    if config.data_format == 'eigen':
+        ex0_prev, ela0_prev = model(x_t, adj_t, flags, u, la_t, time)
+    else:
+        e_prev = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
     for t in noise_scheduler.timesteps:
         with torch.no_grad():
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
             if config.data_format == 'eigen':
                 ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+                ela0_prev_ = ela0_prev
+                ex0 = alpha * ex0 + (1 - alpha) * ex0_prev 
+                ela0 = alpha * ela0 + (1 - alpha) * ela0_prev 
+                ex0_prev = ex0
+                ela0_prev = ela0
+
                 x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
                 la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
-                
-                if log_x0_predictions:
-                    prev_adj_t = adj_t
                 adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
                 x_t = mask_x(x_t, flags)
                 adj_t = mask_adjs(adj_t, flags)
                 if log_x0_predictions:
-                    diffs.append(torch.norm(adj_t - prev_adj_t))
+                    diffs.append(torch.norm(ela0 - ela0_prev_))
                     la_0 = pred_x0(
                         et=ela0,
                         xt=la_t,
@@ -72,17 +81,19 @@ def sample(
                         reflect=False,
                     )
                     adj_0 = torch.bmm(u, torch.bmm(torch.diag_embed(la_0), u_T))
-                    adj_0s.append(adj_0.cpu().reshape(1, 1, config.max_n_nodes, config.max_n_nodes))
+                    adj_0s.append(adj_0.cpu().reshape(len(sizes), 1, config.max_n_nodes, config.max_n_nodes))
             else:
                 e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-                if log_x0_predictions:
-                    prev_adj_t = adj_t
+                e_prev_ = e_prev
+                e0 = alpha * e0 + (1 - alpha) * e_prev
+                e_prev = e0
                 adj_t = predict_xnext(
                     config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                 )
 
                 if log_x0_predictions:
-                    diffs.append(torch.norm(adj_t - prev_adj_t))
+                    diffs.append(torch.norm(e0 - e_prev_))
+                    e_prev = e0
                     adj_0 = pred_x0(
                         et=e0,
                         xt=adj_t,
@@ -139,6 +150,7 @@ def copaint(
 
     reflect = config.reflect
     zero_diagonal = config.zero_diagonal
+    adj_mask=None
     if config.data_format == 'eigen':
         x_t = torch.randn((batch_size, config.max_n_nodes, config.max_feat_num), device=accelerator.device)
         la_t =  torch.randn((batch_size, config.max_n_nodes), device=accelerator.device)
@@ -181,7 +193,7 @@ def copaint(
     if log_x0_predictions:
         wandb.init(
             # set the wandb project where this run will be logged
-            project="Copaint Ablation",
+            project="Copaint Eigen Ablation",
             # track hyperparameters and run metadata
             config={
                 "inpainter": "copaint",
@@ -202,10 +214,14 @@ def copaint(
                 "opt_num_path": opt_num_path,
             },
         )
-    model.eval()
+    if config.data_format == 'eigen':
+        data_t = (x_t, la_t, adj_t)
+    else:
+        data_t = adj_t
     for prev_t, cur_t in time_pairs:
-        for repeat_step in range(repeat_tt):
+        for repeat_step in range(repeat_tt + 1):
             # optimize x_t given x_0
+            print('optimize from', prev_t, 'to', cur_t)
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
                     lr_xt = lr_x[t_]
@@ -215,8 +231,11 @@ def copaint(
                         (batch_size,), t.item(), device=accelerator.device
                     )
                     if config.data_format == 'eigen':
+                        # u = u.detach().requires_grad_()
+                        # flags = flags.detach().requires_grad_()
+                        x_t = x_t.detach().requires_grad_()
                         la_t = la_t.detach().requires_grad_()
-                        x_t = mask_x(x_t, flags).detach().requires_grad_()
+                        x_t = mask_x(x_t, flags)
                         adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
                         adj_t = mask_adjs(adj_t, flags)
                         data_t = (x_t, la_t, adj_t)
@@ -224,7 +243,6 @@ def copaint(
                         adj_t = adj_t * adj_mask
                         adj_t = adj_t.detach().requires_grad_()
                         data_t = adj_t
-
                     data_t = optimize_xt(
                         config,
                         model,
@@ -250,11 +268,11 @@ def copaint(
                         flags=flags,
                     )
                     if config.data_format == 'eigen':
-                        x_t, la_t, _ = data_t
+                        x_t, la_t, adj_t = data_t
                     else:
                         adj_t = data_t
-
-                    if log_x0_predictions and repeat_step == repeat_tt - 1:
+                    
+                    if log_x0_predictions and repeat_step == repeat_tt:
                         if config.data_format == 'eigen':
                             ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
                             la_0 = pred_x0(
@@ -291,7 +309,6 @@ def copaint(
                             / sz
                         )
                         wandb.log({"time_step": t_, "target_loss": target_loss.item()})
-                        del e0, adj_0
                         if accelerator.device.type == "cuda":
                             torch.cuda.empty_cache()
 
@@ -306,20 +323,32 @@ def copaint(
                         adj_t = predict_xnext(
                             config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                         )
-
-                # time-travel (forward diffusion)
-                if time_travel and (cur_t + 1) <= T - tau:
-                    adj_t = time_travel_fn(
-                        adj_t,
-                        adj_mask,
+            # time-travel (forward diffusion)
+            if time_travel and (cur_t + 1) <= T - tau and repeat_step < repeat_tt:
+                print('time_travel from', cur_t, 'to', prev_t)
+                if config.data_format == 'eigen':
+                    data_mask = flags
+                else:
+                    data_mask = adj_mask
+                data_t = time_travel_fn(
+                        config,
+                        data_t,
+                        data_mask,
                         noise_scheduler,
                         accelerator,
                         prev_t,
                         cur_t,
                         optimize_before_time_travel,
+                        u=u,
                     )
-
-    adj_t = adj_t * adj_mask
+                if config.data_format == 'eigen':
+                    x_t, la_t, adj_t = data_t
+                else:
+                    adj_t = data_t
+    if config.data_format == 'eigen':
+        adj_t = mask_adjs(adj_t, flags)
+    else:
+        adj_t = adj_t * adj_mask
     return adj_t
 
 
