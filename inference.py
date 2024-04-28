@@ -383,7 +383,8 @@ def inference(
                 repeat_tt=repeat_tt,
                 time_travel=time_travel,
                 tau=tau,
-                log_x0_predictions=log_x0_predictions,)
+                log_x0_predictions=log_x0_predictions,
+                alpha=alpha)
         edges = edges.reshape(batch_sz, max_n_nodes, max_n_nodes)
         for k, size in enumerate(sizes[i:i+batch_sz]):
             edges_k = edges[k, :size, :size]
