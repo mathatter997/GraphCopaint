@@ -174,6 +174,7 @@ def copaint(
     time_pairs.append(end)
 
     time = torch.full((batch_size,), noise_scheduler.timesteps[0].item(), device=accelerator.device)
+    adj_prev = None
     if config.data_format == 'eigen':
         ex0_prev, ela0_prev = model(x_t, adj_t, flags, u, la_t, time)
     else:
@@ -334,6 +335,9 @@ def copaint(
                         adj_t = predict_xnext(
                             config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                         )
+                        if adj_prev:
+                            adj_t = alpha * adj_t + (1 - alpha) * adj_prev
+                        adj_prev = adj_t.clone().detach().requires_grad_()
             # time-travel (forward diffusion)
             if time_travel and (cur_t + 1) <= T - tau and repeat_step < repeat_tt:
                 if config.data_format == 'eigen':
