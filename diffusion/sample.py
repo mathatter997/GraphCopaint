@@ -139,6 +139,7 @@ def copaint(
     log_x0_predictions=False,
     lr_xt_path=None,
     opt_num_path=None,
+    alpha=1,
 ):
     model.eval()
     batch_size = len(sizes)
@@ -172,6 +173,11 @@ def copaint(
     end = (time_pairs[-1][-1], torch.tensor(-1, device=accelerator.device))
     time_pairs.append(end)
 
+    time = torch.full((batch_size,), noise_scheduler.timesteps[0].item(), device=accelerator.device)
+    if config.data_format == 'eigen':
+        ex0_prev, ela0_prev = model(x_t, adj_t, flags, u, la_t, time)
+    else:
+        e_prev = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
     if lr_xt_path is None:
         lr_x = lr_xt * torch.pow(lr_xt_decay, torch.arange(T + 1))
         lr_x = torch.flip(lr_x, [0])
@@ -221,7 +227,6 @@ def copaint(
     for prev_t, cur_t in time_pairs:
         for repeat_step in range(repeat_tt + 1):
             # optimize x_t given x_0
-            print('optimize from', prev_t, 'to', cur_t)
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
                     lr_xt = lr_x[t_]
@@ -314,12 +319,18 @@ def copaint(
 
                     if config.data_format == 'eigen':
                         ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
+                        ex0 = alpha * ex0 + (1 - alpha) * ex0_prev
+                        ela0 = alpha * ela0 + (1 - alpha) * ela0_prev
+                        ex0_prev = ex0
+                        ela0_prev = ela0
                         x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
                         la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
                         adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
                         adj_t = mask_adjs(adj_t, flags)
                     else:
                         e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
+                        e0 = alpha * e0 + (1 - alpha) * e_prev
+                        e_prev = e0
                         adj_t = predict_xnext(
                             config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                         )

@@ -369,6 +369,7 @@ def inference(
                 lr_xt_path=lr_xt_path,
                 opt_num_path=opt_num_path,
                 u=u_batch,
+                alpha=alpha,
             )
         elif inpainter == 'repaint':
             edges = repaint(
