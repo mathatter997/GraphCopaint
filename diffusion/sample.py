@@ -330,13 +330,12 @@ def copaint(
                     else:
                         e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
                         e0 = alpha * e0 + (1 - alpha) * e_prev
-                        e_prev = e0
+                        e_prev = e0.clone().detach().requires_grad_()
                         adj_t = predict_xnext(
                             config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                         )
             # time-travel (forward diffusion)
             if time_travel and (cur_t + 1) <= T - tau and repeat_step < repeat_tt:
-                print('time_travel from', cur_t, 'to', prev_t)
                 if config.data_format == 'eigen':
                     data_mask = flags
                 else:

@@ -296,7 +296,6 @@ def optimize_xt(
             origin_adj, adj_t
         )
         loss = loss / loss_norm
-        print(loss, loss_norm, t)
         if config.data_format == 'eigen':
             la_t_grad = torch.autograd.grad(
                 loss, la_t, retain_graph=True, create_graph=False
