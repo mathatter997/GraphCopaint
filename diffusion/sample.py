@@ -410,7 +410,7 @@ def repaint(
             },
         )
     for prev_t, cur_t in time_pairs:
-        for repeat_step in range(repeat_tt):
+        for repeat_step in range(repeat_tt + 1):
             with torch.enable_grad():
                 for t_ in range(prev_t.item(), cur_t.item(), -1):
                     if config.sampler == "vpsde":
@@ -431,7 +431,7 @@ def repaint(
                     adj_target_t = noise_scheduler.add_noise(target_adj, noise, time)
 
                     adj_t = (1 - target_mask) * adj_t + target_mask * adj_target_t
-                    if log_x0_predictions and repeat_step == repeat_tt - 1:
+                    if log_x0_predictions and repeat_step == repeat_tt:
                         e0 = predict_e0(
                             config, model, adj_t, time, num_timesteps, adj_mask
                         )
@@ -460,8 +460,9 @@ def repaint(
                             torch.cuda.empty_cache()
 
                 # time-travel (forward diffusion)
-                if time_travel and (cur_t + 1) <= T - tau:
+                if time_travel and (cur_t + 1) <= T - tau and repeat_step < repeat_tt:
                     adj_t = time_travel_fn(
+                        config,
                         adj_t,
                         adj_mask,
                         noise_scheduler,
@@ -469,6 +470,7 @@ def repaint(
                         prev_t,
                         cur_t,
                         optimize_before_time_travel=False,
+                        u=None,
                     )
 
     adj_t = adj_t * adj_mask
