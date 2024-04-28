@@ -366,6 +366,7 @@ def repaint(
     target_mask=None,
     target_adj=None,
     log_x0_predictions=False,
+    alpha=1,
 ):
     model.eval()
     noise_scheduler.set_timesteps(num_inference_steps)
@@ -409,6 +410,8 @@ def repaint(
                 "sampler": config.sampler,
             },
         )
+    time = torch.full((batch_size,), noise_scheduler.timesteps[0].item(), device=accelerator.device)
+    e_prev= predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
     for prev_t, cur_t in time_pairs:
         for repeat_step in range(repeat_tt + 1):
             with torch.enable_grad():
@@ -421,6 +424,8 @@ def repaint(
                         e0 = predict_e0(
                             config, model, adj_t, time, num_timesteps, adj_mask
                         )
+                        e0 = alpha * e0 + (1 - alpha) * e_prev
+                        e_prev = e0
                     adj_t = predict_xnext(
                         config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                     )
