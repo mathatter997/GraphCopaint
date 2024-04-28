@@ -321,8 +321,8 @@ def copaint(
                         ex0, ela0 = model(x_t, adj_t, flags, u, la_t, time)
                         ex0 = alpha * ex0 + (1 - alpha) * ex0_prev
                         ela0 = alpha * ela0 + (1 - alpha) * ela0_prev
-                        ex0_prev = ex0
-                        ela0_prev = ela0
+                        ex0_prev = ex0.clone().detach().requires_grad_()
+                        ela0_prev = ela0.clone().detach().requires_grad_()
                         x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
                         la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
                         adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
