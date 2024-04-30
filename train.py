@@ -34,7 +34,7 @@ from diffusion.utils import dense_adj, init_eigen
                                  'mnist_zeros',
                                  'ego_small',
                                  'ego',
-                                 'enzyme'
+                                 'enzyme',
                                  'grid'], case_sensitive=False),
 )
 @click.option("--cpu", default=False)
