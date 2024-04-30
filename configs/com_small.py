@@ -19,8 +19,8 @@ class CommunitySmallConfig:
     output_dir = f"models/{data_name}/"  # the model name locally and on the HF Hub
     output_dir_gnn = "gnn/checkpoint_epoch_{}.pth"
     model = 'pgsn'
-    # model = 'eigen'
     data_format = 'graph'
+    # model = 'eigen'
     # data_format = 'eigen'
     label = f"_t{train_timesteps}_{model}"
 

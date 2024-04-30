@@ -40,7 +40,6 @@
 # python evaluate.py --dataset 'Ego_small' --pred_file data/dataset/output_ego_small_vpsde.json
 
 
-
 # python evaluate.py --dataset 'Community_small' --pred_file 'data/dataset/output_com_small_copaint.json' \
 #     --inpaint_loss True --mask_path 'data/dataset/mask_com_small_copaint.json' \
 #     --masked_target_path 'data/dataset/masked_com_small_copaint.json'
@@ -61,22 +60,22 @@
 #             relu_init100_start600_xT600\
 #             relu_init1000_start200_xT600)
 
-lr_xt_paths=(exp_init25_decay1.0 \
-            exp_init25_decay1.002 \
-            exp_init25_decay1.004 \
-            exp_init25_decay1.006 \
-            relu_init25_start100_xT50 \
-            relu_init25_start200_xT50
-            relu_init25_start100_xT200 \
-            relu_init25_start200_xT200 \
-            relu_init25_start100_xT400 \
-            relu_init25_start200_xT400 \
-            )
-echo COM
-for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
-    python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json 
-    echo ${lr_xt_paths[$i]}
-done
+# lr_xt_paths=(exp_init25_decay1.0 \
+#             exp_init25_decay1.002 \
+#             exp_init25_decay1.004 \
+#             exp_init25_decay1.006 \
+#             relu_init25_start100_xT50 \
+#             relu_init25_start200_xT50
+#             relu_init25_start100_xT200 \
+#             relu_init25_start200_xT200 \
+#             relu_init25_start100_xT400 \
+#             relu_init25_start200_xT400 \
+#             )
+# echo COM
+# for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
+#     python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/output_copaint_noclip_adaptive_${lr_xt_paths[$i]}.json 
+#     echo ${lr_xt_paths[$i]}
+# done
 # lr_xt_paths=(exp_init25_decay1.006)
 # for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
 #     python evaluate.py --dataset 'Community_small' \
@@ -122,3 +121,10 @@ done
 # python evaluate.py --dataset 'Community_small' --pred_file data/dataset/ablation/com/eigen/output_copaint_lr0_rt_20_tau_1.json
 
 
+# python evaluate.py --dataset 'Community_small' --pred_file data/output_com_small_ddim_special.json
+# python evaluate.py --dataset 'Community_small' --pred_file data/dataset/output_com_small.json
+# python evaluate.py --dataset 'ENZYMES' --pred_file data/output_enzyme_vpsde_bm20_s113.json
+# python evaluate.py --dataset 'Ego_small' --pred_file data/dataset/output_ego_small_ddim.json
+
+# python evaluate.py --dataset 'Ego_small' --pred_file data/dataset/output_ego_small_ddpm.json
+python evaluate.py --dataset 'Community_small' --pred_file data/dataset/output_com_small_ddpm.json

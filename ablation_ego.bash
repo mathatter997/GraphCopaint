@@ -19,7 +19,7 @@ for ((i = 0; i < ${#lr_xt_paths[@]}; i++)); do
         --lr_xt_path lr_x/${lr_xt_paths[$i]}.json \
         --loss_mode ${loss_mode} --reg_mode ${reg_mode} \
         --num_intervals 1 --optimization_steps 2 --tau 5 --time_travel True \
-        --use_adaptive_lr_xt False \
+        --use_adaptive_lr_xt True \
         --checkpoint_path models/Ego_small/gnn/checkpoint_epoch_200000_t1000_psgn.pth \
         --scheduler_path models/Ego_small/scheduler_config.json \
         --output_path data/dataset/ablation/ego/output_copaint_${lr_xt_paths[$i]}.json \

@@ -30,7 +30,7 @@ def plot_loss_and_samples(config, adj_0s, size):
                 G.add_node(i)
             for i in range(size):
                 for j in range(i + 1, size):
-                    if edges[i, j] > 0:
+                    if edges[i, j] > 0.2:
                         G.add_edge(i, j, weight = edges[i, j])
             weights = [G[u][v]['weight'] for u, v in G.edges()]
             pos = nx.spring_layout(G, seed=7) 

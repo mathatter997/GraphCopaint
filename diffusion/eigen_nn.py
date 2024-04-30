@@ -37,7 +37,6 @@ class EigenNN(torch.nn.Module):
                     c_hid,
                     c_final,
                     adim,
-                    depth=depth,
                     num_heads=num_heads,
                     conv=conv,
                 ),

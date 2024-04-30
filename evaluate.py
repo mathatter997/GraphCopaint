@@ -35,7 +35,7 @@ def evaluate(
 
         results_data = eval_fn(test_dataset=test_dataset, pred_graph_list=train_dataset)
         results_pred = eval_fn(test_dataset=test_dataset, pred_graph_list=pred_graphs)
-        # print(f"{dataset} data:", results_data)
+        print(f"{dataset} data:", results_data)
         # print(f"{dataset} pred:", results_pred)
         deg = results_pred['degree_rbf']
         clus = results_pred['cluster_rbf']

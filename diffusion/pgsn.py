@@ -161,6 +161,18 @@ class PGSN(nn.Module):
         h = modules[m_idx](h)
         m_idx += 1
 
+        # if (time_cond.item() in {900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 10, 5, 1}):
+        #     with open(f'data_{time_cond.item()}.json', 'w') as f:
+        #         import json
+        #         edge_index, _ = dense_to_sparse(adj)
+        #         iedge_index, _ = dense_to_sparse((1 - adj) * mask.squeeze(1))
+        #         json.dump({'dense': h_dense_edge.numpy().tolist(),
+        #                    'h': h.numpy().tolist(),
+        #                    'edge': edge_index.numpy().tolist(),
+        #                     'iedge':iedge_index.numpy().tolist(),
+        #                     'cont_adj':cont_adj.numpy().tolist(),
+        #                     'x_pos': x_pos.numpy().tolist(),
+        #                     'x_degree': x_degree.numpy().tolist()}, f)
         # make edge estimation symmetric
         h = (h + h.transpose(2, 3)) / 2. * mask
 
