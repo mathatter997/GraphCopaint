@@ -5,7 +5,7 @@ class GridConfig:
     max_n_nodes = None
     data_filepath = "data/dataset/"
     data_name = "grid"
-    train_batch_size = 32
+    train_batch_size = 2
     eval_batch_size = 4  # how many to sample during evaluation
     num_epochs = 400000
     start_epoch = 0
