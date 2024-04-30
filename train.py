@@ -21,6 +21,7 @@ from configs.mnist_zeros import MnistZerosConfig
 from configs.ego_small import EgoSmallConfig
 from configs.ego import EgoConfig
 from configs.enzyme import EnzymeConfig
+from configs.grid import GridConfig
 from diffusion.utils import dense_adj, init_eigen
 
 
@@ -33,7 +34,8 @@ from diffusion.utils import dense_adj, init_eigen
                                  'mnist_zeros',
                                  'ego_small',
                                  'ego',
-                                 'enzyme'], case_sensitive=False),
+                                 'enzyme'
+                                 'grid'], case_sensitive=False),
 )
 @click.option("--cpu", default=False)
 def train_ddpm(
@@ -51,6 +53,8 @@ def train_ddpm(
         config = EgoConfig()
     elif config_type == 'enzyme':
         config = EnzymeConfig()
+    elif config_type == 'grid':
+        config = GridConfig()
     config.checkpoint_path = checkpoint_path
     config.sampler = 'ddpm'
 
