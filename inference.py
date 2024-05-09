@@ -71,7 +71,7 @@ import random
 @click.option("--lr_xt_path",default=None)
 @click.option("--opt_num_path",default=None)
 @click.option("--alpha",default=1.0)
-
+@click.option("--gamma",default=0)
 def inference(
     config_type,
     checkpoint_path,
@@ -103,7 +103,8 @@ def inference(
     opt_num_path,
     max_n_nodes,
     alpha,
-):
+    gamma,
+):  
     if config_type == "community_small":
         config = CommunitySmallConfig()
     elif config_type == "community_small_smooth":
@@ -370,6 +371,7 @@ def inference(
                 opt_num_path=opt_num_path,
                 u=u_batch,
                 alpha=alpha,
+                gamma=gamma,
             )
         elif inpainter == 'repaint':
             edges = repaint(

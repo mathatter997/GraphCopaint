@@ -49,11 +49,14 @@ def sample(
         adj_0s = []
         diffs = []
     time = torch.full((batch_size,), noise_scheduler.timesteps[0].item(), device=accelerator.device)
+    T =  noise_scheduler.timesteps[0].item()
     if config.data_format == 'eigen':
         ex0_prev, ela0_prev = model(x_t, adj_t, flags, u, la_t, time)
     else:
         e_prev = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
     for t in noise_scheduler.timesteps:
+
+        print(t)
         with torch.no_grad():
             time = torch.full((batch_size,), t.item(), device=accelerator.device)
             if config.data_format == 'eigen':
@@ -64,6 +67,7 @@ def sample(
                 ex0_prev = ex0
                 ela0_prev = ela0
 
+                adj_t_prev = adj_t.clone()
                 x_t = predict_xnext(config, noise_scheduler, ex0, x_t, mask=None, t=t, reflect=False)
                 la_t = predict_xnext(config, noise_scheduler, ela0, la_t, mask=None, t=t, reflect=False)
                 adj_t = torch.bmm(u, torch.bmm(torch.diag_embed(la_t), u_T))
@@ -80,18 +84,30 @@ def sample(
                         interval_num=1,
                         reflect=False,
                     )
+                    if (t.item() in {900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 10, 5, 1}):
+                        with open(f'data_diff_eigen_{t.item()}.json', 'w') as f:
+                            import json
+                            json.dump({'adj_diff': (adj_t - adj_t_prev).numpy().tolist()}, f)
                     adj_0 = torch.bmm(u, torch.bmm(torch.diag_embed(la_0), u_T))
                     adj_0s.append(adj_0.cpu().reshape(len(sizes), 1, config.max_n_nodes, config.max_n_nodes))
             else:
                 e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
                 e_prev_ = e_prev
-                e0 = alpha * e0 + (1 - alpha) * e_prev
+                # e0 = alpha * e0 + (1 - alpha) * e_prev
                 e_prev = e0
+                adj_t_prev = adj_t.clone()
                 adj_t = predict_xnext(
                     config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                 )
+                # adj_t = alpha * adj_t + (1 - alpha) * adj_t_prev
 
                 if log_x0_predictions:
+                    if (t.item() in {900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 10, 5, 1}):
+                        with open(f'data_diff_pgsn_discrete_{t.item()}.json', 'w') as f:
+                            import json
+                            n = sizes[0]
+                            json.dump({'adj_diff': ((adj_t > 0).to(int)[:,:,:n,:n] - (adj_t_prev > 0).to(int)[:,:,:n,:n]).numpy().tolist(),
+                                    'e0': e0.numpy().tolist()}, f)
                     diffs.append(torch.norm(e0 - e_prev_))
                     e_prev = e0
                     adj_0 = pred_x0(
@@ -103,6 +119,9 @@ def sample(
                         interval_num=1,
                         reflect=reflect,
                     )
+                    adj_t_ = (noise_scheduler.alphas_cumprod[t]) * adj_0
+                    gamma = 0.99 ** t
+                    adj_t = gamma * adj_t_+ (1 - gamma) * adj_t 
                     adj_0s.append(adj_0.cpu())
     if log_x0_predictions:
         if len(sizes) == 1:
@@ -140,7 +159,10 @@ def copaint(
     lr_xt_path=None,
     opt_num_path=None,
     alpha=1,
+    gamma=0,
 ):
+
+
     model.eval()
     batch_size = len(sizes)
     loss_norm = batch_size
@@ -294,7 +316,7 @@ def copaint(
                             e0 = predict_e0(
                                 config, model, adj_t, time, num_timesteps, adj_mask
                             )
-                            e0 = alpha * e0 + (1 - alpha) * e_prev
+                            # e0 = alpha * e0 + (1 - alpha) * e_prev
                             adj_0 = pred_x0(
                                 et=e0,
                                 xt=adj_t,
@@ -330,11 +352,23 @@ def copaint(
                         adj_t = mask_adjs(adj_t, flags)
                     else:
                         e0 = predict_e0(config, model, adj_t, time, num_timesteps, adj_mask)
-                        e0 = alpha * e0 + (1 - alpha) * e_prev
-                        e_prev = e0.clone().detach().requires_grad_()
+                        # e0 = alpha * e0 + (1 - alpha) * e_prev
+                        # e_prev = e0.clone().detach().requires_grad_()
+                        adj_0 = pred_x0(
+                                et=e0,
+                                xt=adj_t,
+                                t=t,
+                                mask=adj_mask,
+                                scheduler=noise_scheduler,
+                                interval_num=interval_num,
+                                reflect=reflect,
+                            )
+                        adj_t_ = ((noise_scheduler.alphas_cumprod[t]) * adj_0).clone().detach().requires_grad_()
                         adj_t = predict_xnext(
                             config, noise_scheduler, e0, adj_t, adj_mask, t, reflect=reflect
                         )
+                        coef = gamma ** t
+                        adj_t = coef * adj_t_+ (1 - coef) * adj_t 
             # time-travel (forward diffusion)
             if time_travel and (cur_t + 1) <= T - tau and repeat_step < repeat_tt:
                 if config.data_format == 'eigen':
